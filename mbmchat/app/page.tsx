@@ -139,17 +139,18 @@ export default function MBMChatWorkspace() {
     if (msgData) setMessages(msgData);
   };
 
-  // Auth: Step 1 - Send OTP to Email
+  // Auth: Step 1 - Send 6-Digit OTP directly to Email
   const handleRequestOtp = async () => {
     if (!studentEmail.trim() || !studentName.trim() || !rollNo.trim()) {
       alert('Please fill Name, Roll Number, and Email!');
       return;
     }
     setAuthLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
+
+    const { error } = await supabase.auth.signUp({
       email: studentEmail.trim(),
+      password: `MBM#${Math.random().toString(36).slice(2, 10)}!`,
       options: {
-        shouldCreateUser: true,
         data: {
           full_name: studentName.trim(),
           roll_no: rollNo.trim(),
@@ -163,10 +164,18 @@ export default function MBMChatWorkspace() {
     setAuthLoading(false);
 
     if (error) {
-      alert(`Error sending OTP: ${error.message}`);
+      const { error: otpErr } = await supabase.auth.signInWithOtp({
+        email: studentEmail.trim()
+      });
+      if (otpErr) {
+        alert(`Error: ${otpErr.message}`);
+      } else {
+        setAuthStep('otp');
+        alert(`Verification code sent to ${studentEmail}. Please check your email inbox / spam.`);
+      }
     } else {
       setAuthStep('otp');
-      alert(`6-digit OTP sent to ${studentEmail}. Please check your inbox / spam.`);
+      alert(`6-digit OTP code sent to ${studentEmail}. Please check your email inbox / spam.`);
     }
   };
 
@@ -177,11 +186,24 @@ export default function MBMChatWorkspace() {
       return;
     }
     setAuthLoading(true);
-    const { data, error } = await supabase.auth.verifyOtp({
+    
+    // Check verification with signup type first, then fallback to email OTP
+    let { data, error } = await supabase.auth.verifyOtp({
       email: studentEmail.trim(),
       token: otpCode.trim(),
-      type: 'email'
+      type: 'signup'
     });
+
+    if (error) {
+      const retry = await supabase.auth.verifyOtp({
+        email: studentEmail.trim(),
+        token: otpCode.trim(),
+        type: 'email'
+      });
+      data = retry.data;
+      error = retry.error;
+    }
+
     setAuthLoading(false);
 
     if (error) {
@@ -190,6 +212,9 @@ export default function MBMChatWorkspace() {
       setSessionActive(true);
       const meta = data.user?.user_metadata;
       if (meta?.full_name) setStudentName(meta.full_name);
+      if (meta?.roll_no) setRollNo(meta.roll_no);
+      if (meta?.branch) setBranch(meta.branch);
+      if (meta?.year) setYear(meta.year);
     }
   };
 
@@ -397,7 +422,7 @@ export default function MBMChatWorkspace() {
                       type="text" 
                       value={studentName}
                       onChange={e => setStudentName(e.target.value)}
-                      placeholder="e.g. Rahul Sharma" 
+                      placeholder="e.g. Vineet Kaler" 
                       className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
                     />
                   </div>
@@ -614,7 +639,6 @@ export default function MBMChatWorkspace() {
                 ))}
               </div>
 
-              {/* Bio & Interests Preview on Home */}
               <div className="p-5 rounded-3xl bg-[#070b14] border border-white/5 space-y-3 font-mono text-xs">
                 <div className="text-[10px] uppercase text-slate-500 font-bold tracking-wider">Your Campus Bio</div>
                 <p className="text-slate-300 text-sm italic font-sans">"{studentBio}"</p>
