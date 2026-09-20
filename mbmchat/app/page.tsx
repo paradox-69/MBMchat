@@ -11,6 +11,25 @@ import {
 
 const ADMIN_EMAILS = ['kalervineet4@gmail.com'];
 
+const MBM_BRANCHES = [
+  'Electrical Engineering',
+  'Mechanical Engineering',
+  'Chemical Engineering',
+  'Electronics & Communication Engineering',
+  'Petroleum Engineering',
+  'Civil Engineering',
+  'Computer Science & Engineering',
+  'Production & Industrial Engineering',
+  'Mining Engineering',
+  'Bachelor of Planning',
+  'Information Technology',
+  'Artificial Intelligence and Data Science',
+  'Electronics & Electrical Engineering',
+  'Electronics & Computer Engineering',
+  'Building and Construction Technology',
+  'Bachelor of Architecture'
+];
+
 export default function MBMChatWorkspace() {
   const [activeTab, setActiveTab] = useState<
     'home' | 'feed' | 'chats' | 'wall' | 'confessions' | 
@@ -20,6 +39,7 @@ export default function MBMChatWorkspace() {
   // Authentication State
   const [sessionActive, setSessionActive] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authStep, setAuthStep] = useState<'details' | 'otp'>('details');
   const [authLoading, setAuthLoading] = useState(false);
   
   // Registration & Login Fields
@@ -27,8 +47,9 @@ export default function MBMChatWorkspace() {
   const [studentPassword, setStudentPassword] = useState('');
   const [studentName, setStudentName] = useState('');
   const [rollNo, setRollNo] = useState('');
-  const [branch, setBranch] = useState('Mining Engineering');
+  const [branch, setBranch] = useState(MBM_BRANCHES[0]);
   const [year, setYear] = useState('1st Year');
+  const [otpCode, setOtpCode] = useState('');
 
   // Profile Customization & Persistence
   const [studentBio, setStudentBio] = useState('Mining Engineering student at MBM University.');
@@ -84,7 +105,7 @@ export default function MBMChatWorkspace() {
         if (profile) {
           setStudentName(profile.full_name || profile.name || '');
           setRollNo(profile.roll_no || '');
-          setBranch(profile.branch || 'Mining Engineering');
+          setBranch(profile.branch || MBM_BRANCHES[0]);
           setYear(profile.year || '1st Year');
           if (profile.bio) setStudentBio(profile.bio);
           if (profile.interests) setStudentInterests(profile.interests);
@@ -277,7 +298,7 @@ export default function MBMChatWorkspace() {
     });
   };
 
-  // Authentication
+  // Authentication - Login
   const handlePasswordLogin = async () => {
     if (!studentEmail.trim() || !studentPassword.trim()) {
       alert('Please enter your email and password.');
@@ -298,9 +319,10 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  const handleRegisterInstant = async () => {
+  // Authentication - Registration Step 1: Send OTP
+  const handleSendOtpRegister = async () => {
     if (!studentEmail.trim() || !studentPassword.trim() || !studentName.trim() || !rollNo.trim()) {
-      alert('All registration fields are mandatory.');
+      alert('All registration fields are mandatory (Name, Roll No, Branch, Year, Email, Password).');
       return;
     }
     setAuthLoading(true);
@@ -321,10 +343,43 @@ export default function MBMChatWorkspace() {
     setAuthLoading(false);
 
     if (error) {
-      alert(error.message);
+      alert('Registration Error: ' + error.message);
     } else {
+      alert(`OTP email par send ho gaya hai (${studentEmail}). Email inbox ya spam folder check karein.`);
+      setAuthStep('otp');
+    }
+  };
+
+  // Authentication - Registration Step 2: Verify OTP
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim()) {
+      alert('Please enter the 6-digit OTP received in your email.');
+      return;
+    }
+    setAuthLoading(true);
+    let { data, error } = await supabase.auth.verifyOtp({
+      email: studentEmail.trim(),
+      token: otpCode.trim(),
+      type: 'signup'
+    });
+
+    if (error) {
+      const retry = await supabase.auth.verifyOtp({
+        email: studentEmail.trim(),
+        token: otpCode.trim(),
+        type: 'email'
+      });
+      data = retry.data;
+      error = retry.error;
+    }
+    setAuthLoading(false);
+
+    if (error) {
+      alert('Invalid OTP: ' + error.message);
+    } else {
+      alert('Email Verified! Welcome to MBMChat.');
       setSessionActive(true);
-      alert('Registration successful! Welcome to MBM Campus Portal.');
+      window.location.reload();
     }
   };
 
@@ -373,7 +428,7 @@ export default function MBMChatWorkspace() {
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
       setCapturedSnapUrl(canvas.toDataURL('image/jpeg', 0.85));
       stopCamera();
-      setIsCameraOpen(true); // Keep modal for preview
+      setIsCameraOpen(true);
     }
   };
 
@@ -433,14 +488,14 @@ export default function MBMChatWorkspace() {
             <div className="max-w-md mx-auto w-full space-y-5">
               <div className="grid grid-cols-2 p-1 bg-white/5 border border-white/10 rounded-2xl font-mono text-xs">
                 <button 
-                  onClick={() => setAuthMode('login')}
+                  onClick={() => { setAuthMode('login'); setAuthStep('details'); }}
                   className={`py-2 rounded-xl font-bold transition flex items-center justify-center gap-2 ${authMode === 'login' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span>Sign In</span>
                 </button>
                 <button 
-                  onClick={() => setAuthMode('register')}
+                  onClick={() => { setAuthMode('register'); setAuthStep('details'); }}
                   className={`py-2 rounded-xl font-bold transition flex items-center justify-center gap-2 ${authMode === 'register' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                 >
                   <UserPlus className="w-3.5 h-3.5" />
@@ -449,7 +504,8 @@ export default function MBMChatWorkspace() {
               </div>
 
               <div className="space-y-3 font-mono text-xs">
-                {authMode === 'register' && (
+                {/* Registration Details Form */}
+                {authMode === 'register' && authStep === 'details' && (
                   <>
                     <div>
                       <label className="text-slate-400 text-[11px] mb-1 block">Full Name</label>
@@ -472,39 +528,141 @@ export default function MBMChatWorkspace() {
                         className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
                       />
                     </div>
+
+                    {/* Department / Branch Dropdown */}
+                    <div>
+                      <label className="text-slate-400 text-[11px] mb-1 block">Department / Branch</label>
+                      <select 
+                        value={branch}
+                        onChange={e => setBranch(e.target.value)}
+                        className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2.5 py-2.5 text-white text-xs outline-none focus:border-indigo-500"
+                      >
+                        {MBM_BRANCHES.map(b => (
+                          <option key={b} value={b}>{b}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Academic Year Dropdown */}
+                    <div>
+                      <label className="text-slate-400 text-[11px] mb-1 block">Academic Year</label>
+                      <select 
+                        value={year}
+                        onChange={e => setYear(e.target.value)}
+                        className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2.5 py-2.5 text-white text-xs outline-none focus:border-indigo-500"
+                      >
+                        <option value="1st Year">1st Year</option>
+                        <option value="2nd Year">2nd Year</option>
+                        <option value="3rd Year">3rd Year</option>
+                        <option value="4th Year">4th Year</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
+                      <input 
+                        type="email" 
+                        value={studentEmail}
+                        onChange={e => setStudentEmail(e.target.value)}
+                        placeholder="student@example.com" 
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
+                      <input 
+                        type="password" 
+                        value={studentPassword}
+                        onChange={e => setStudentPassword(e.target.value)}
+                        placeholder="••••••••" 
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <button 
+                      onClick={handleSendOtpRegister}
+                      disabled={authLoading}
+                      className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
+                    >
+                      <span>{authLoading ? 'Sending OTP...' : 'Send OTP & Register'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
                   </>
                 )}
 
-                <div>
-                  <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
-                  <input 
-                    type="email" 
-                    value={studentEmail}
-                    onChange={e => setStudentEmail(e.target.value)}
-                    placeholder="student@example.com" 
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                  />
-                </div>
+                {/* OTP Verification Step */}
+                {authMode === 'register' && authStep === 'otp' && (
+                  <div className="space-y-4">
+                    <div className="p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-center">
+                      <p className="text-xs text-indigo-300">OTP code sent to:</p>
+                      <p className="font-bold text-white text-xs mt-0.5">{studentEmail}</p>
+                    </div>
 
-                <div>
-                  <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
-                  <input 
-                    type="password" 
-                    value={studentPassword}
-                    onChange={e => setStudentPassword(e.target.value)}
-                    placeholder="••••••••" 
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                  />
-                </div>
+                    <div>
+                      <label className="text-slate-400 text-[11px] mb-1 block">Enter 6-Digit Email OTP</label>
+                      <input 
+                        type="text" 
+                        maxLength={8}
+                        value={otpCode}
+                        onChange={e => setOtpCode(e.target.value)}
+                        placeholder="Enter OTP" 
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-center tracking-widest text-lg font-bold text-cyan-400 outline-none focus:border-indigo-500"
+                      />
+                    </div>
 
-                <button 
-                  onClick={authMode === 'login' ? handlePasswordLogin : handleRegisterInstant}
-                  disabled={authLoading}
-                  className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
-                >
-                  <span>{authLoading ? 'Verifying...' : authMode === 'login' ? 'Sign In' : 'Register Instant'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                    <button 
+                      onClick={handleVerifyOtp}
+                      disabled={authLoading}
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
+                    >
+                      <span>{authLoading ? 'Verifying OTP...' : 'Verify OTP & Enter Campus Portal'}</span>
+                    </button>
+
+                    <button 
+                      onClick={() => setAuthStep('details')}
+                      className="w-full text-center text-[11px] text-slate-400 hover:text-white pt-1"
+                    >
+                      ← Back to Details
+                    </button>
+                  </div>
+                )}
+
+                {/* Login Form */}
+                {authMode === 'login' && (
+                  <>
+                    <div>
+                      <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
+                      <input 
+                        type="email" 
+                        value={studentEmail}
+                        onChange={e => setStudentEmail(e.target.value)}
+                        placeholder="student@example.com" 
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
+                      <input 
+                        type="password" 
+                        value={studentPassword}
+                        onChange={e => setStudentPassword(e.target.value)}
+                        placeholder="••••••••" 
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <button 
+                      onClick={handlePasswordLogin}
+                      disabled={authLoading}
+                      className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
+                    >
+                      <span>{authLoading ? 'Verifying...' : 'Sign In'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -548,7 +706,7 @@ export default function MBMChatWorkspace() {
       {/* Main Grid */}
       <div className="flex-1 max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 pb-16 md:pb-0">
         
-        {/* Navigation Sidebar (Merged Wall & Snaps into 1 Tab) */}
+        {/* Navigation Sidebar */}
         <aside className="hidden md:flex md:col-span-3 border-r border-white/5 p-4 flex-col justify-between font-mono text-xs">
           <div className="space-y-1">
             <div className="text-[10px] uppercase text-slate-500 px-3 py-1 font-bold">Main Menu</div>
@@ -557,7 +715,7 @@ export default function MBMChatWorkspace() {
               { id: 'feed', label: 'Student Opinions', icon: MessageCircle },
               { id: 'confessions', label: 'Confessions', icon: Lock },
               { id: 'chats', label: 'Classmate Chats', icon: MessageSquare },
-              { id: 'wall', label: 'Campus Wall & Snaps', icon: Camera }, // MERGED HERE
+              { id: 'wall', label: 'Campus Wall & Snaps', icon: Camera },
               { id: 'market', label: 'Marketplace', icon: ShoppingBag },
               { id: 'events', label: 'Events Hub', icon: Calendar },
               { id: 'settings', label: 'Settings', icon: Settings },
@@ -624,7 +782,6 @@ export default function MBMChatWorkspace() {
           {/* TAB: STUDENT OPEN OPINIONS & POSTS */}
           {activeTab === 'feed' && (
             <div className="space-y-4 font-sans">
-              {/* Create Post */}
               <div className="p-4 rounded-2xl bg-[#070b14] border border-white/10 space-y-3">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-bold text-slate-400">Share Campus Opinion</span>
@@ -644,7 +801,6 @@ export default function MBMChatWorkspace() {
                 </div>
               </div>
 
-              {/* Feed List with Self-Delete & Report Buttons */}
               <div className="space-y-4">
                 {posts.map(post => {
                   const postComments = comments.filter(c => c.parent_id === post.id);
@@ -658,7 +814,6 @@ export default function MBMChatWorkspace() {
                           <div className="text-[10px] font-mono text-slate-500">{post.branch} • {post.year}</div>
                         </div>
 
-                        {/* Top Action Icons: Self-Delete or Report */}
                         <div className="flex items-center gap-1.5">
                           {isAuthorOrAdmin && (
                             <button
@@ -681,7 +836,6 @@ export default function MBMChatWorkspace() {
 
                       <p className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap">{post.content}</p>
 
-                      {/* Action Bar: Likes & Comments */}
                       <div className="flex items-center gap-4 pt-2 border-t border-white/5 text-xs font-mono text-slate-400">
                         <button 
                           onClick={() => handleLikePost(post.id, post.likes)} 
@@ -700,7 +854,6 @@ export default function MBMChatWorkspace() {
                         </button>
                       </div>
 
-                      {/* Comments Thread */}
                       {activeCommentBox === post.id && (
                         <div className="pt-3 space-y-2 border-t border-white/5">
                           {postComments.map(c => (
@@ -849,7 +1002,7 @@ export default function MBMChatWorkspace() {
             </div>
           )}
 
-          {/* TAB: CAMPUS WALL & SNAPS (MERGED SINGLE TAB) */}
+          {/* TAB: CAMPUS WALL & SNAPS */}
           {activeTab === 'wall' && (
             <div className="space-y-4 font-sans">
               <div className="flex items-center justify-between">
