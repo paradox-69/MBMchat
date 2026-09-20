@@ -465,7 +465,7 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // 1. Send 6-Digit OTP via Custom SMTP (Gmail/Resend)
+  // 1. Send 6-Digit OTP via Custom SMTP
   const handleSendRegistrationOtp = async () => {
     if (!studentEmail.trim() || !studentPassword.trim() || !studentName.trim() || !rollNo.trim()) {
       alert('All registration fields are mandatory (Name, Roll No, Branch, Year, Email, Password).');
