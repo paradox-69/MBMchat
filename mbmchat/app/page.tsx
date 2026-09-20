@@ -6,7 +6,7 @@ import {
   Home, MessageSquare, Camera, Compass, Lock, ShoppingBag, 
   Calendar, Settings, Plus, Send, X, 
   UserPlus, UserMinus, LogOut, ArrowRight, SwitchCamera, User, LogIn,
-  Heart, MessageCircle, CheckCircle2, Flag, Trash2, ShieldAlert
+  Heart, MessageCircle, CheckCircle2, Flag, Trash2, Bell, Check, ShieldAlert
 } from 'lucide-react';
 
 const ADMIN_EMAILS = ['kalervineet4@gmail.com'];
@@ -33,7 +33,7 @@ const MBM_BRANCHES = [
 export default function MBMChatWorkspace() {
   const [activeTab, setActiveTab] = useState<
     'home' | 'feed' | 'chats' | 'wall' | 'confessions' | 
-    'market' | 'events' | 'settings' | 'profile'
+    'market' | 'events' | 'notifications' | 'settings' | 'profile'
   >('home');
 
   // Authentication State (OTP secure flow untouched)
@@ -65,9 +65,10 @@ export default function MBMChatWorkspace() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Friends & P2P Chat State
+  // Friends, Requests & P2P Chat State
   const [chatPeers, setChatPeers] = useState<any[]>([]);
   const [allRegisteredUsers, setAllRegisteredUsers] = useState<any[]>([]);
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
   const [showAddFriendModal, setShowAddFriendModal] = useState(false);
   const [selectedPeer, setSelectedPeer] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -107,7 +108,8 @@ export default function MBMChatWorkspace() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setSessionActive(true);
-        setStudentEmail(session.user.email || '');
+        const userEmail = session.user.email || '';
+        setStudentEmail(userEmail);
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -123,55 +125,23 @@ export default function MBMChatWorkspace() {
           if (profile.bio) setStudentBio(profile.bio);
           if (profile.interests) setStudentInterests(profile.interests);
         }
+
+        fetchAppData(userEmail);
       }
     });
   }, []);
 
   // Supabase Realtime Channels
   useEffect(() => {
-    fetchInitialData();
-
-    const postSub = supabase
-      .channel('public:posts')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
-        fetchPosts();
-      })
-      .subscribe();
-
-    const confessionSub = supabase
-      .channel('public:confessions')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'confessions' }, () => {
-        fetchConfessions();
-      })
-      .subscribe();
-
-    const commentSub = supabase
-      .channel('public:comments')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, payload => {
-        setComments(prev => [...prev, payload.new]);
-      })
-      .subscribe();
-
-    const marketSub = supabase
-      .channel('public:market_items')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'market_items' }, () => {
-        fetchMarketItems();
-      })
-      .subscribe();
-
-    const eventSub = supabase
-      .channel('public:events')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
-        fetchEvents();
-      })
-      .subscribe();
-
-    const msgSub = supabase
-      .channel('public:messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-        setMessages(prev => [...prev, payload.new]);
-      })
-      .subscribe();
+    const postSub = supabase.channel('public:posts').on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => fetchPosts()).subscribe();
+    const confessionSub = supabase.channel('public:confessions').on('postgres_changes', { event: '*', schema: 'public', table: 'confessions' }, () => fetchConfessions()).subscribe();
+    const commentSub = supabase.channel('public:comments').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, payload => setComments(prev => [...prev, payload.new])).subscribe();
+    const marketSub = supabase.channel('public:market_items').on('postgres_changes', { event: '*', schema: 'public', table: 'market_items' }, () => fetchMarketItems()).subscribe();
+    const eventSub = supabase.channel('public:events').on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => fetchEvents()).subscribe();
+    const msgSub = supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => setMessages(prev => [...prev, payload.new])).subscribe();
+    const reqSub = supabase.channel('public:friend_requests').on('postgres_changes', { event: '*', schema: 'public', table: 'friend_requests' }, () => {
+      if (studentEmail) fetchFriendRequests(studentEmail);
+    }).subscribe();
 
     return () => {
       supabase.removeChannel(postSub);
@@ -180,25 +150,48 @@ export default function MBMChatWorkspace() {
       supabase.removeChannel(marketSub);
       supabase.removeChannel(eventSub);
       supabase.removeChannel(msgSub);
+      supabase.removeChannel(reqSub);
     };
-  }, []);
+  }, [studentEmail]);
 
-  const fetchInitialData = async () => {
+  const fetchAppData = (email: string) => {
     fetchPosts();
     fetchConfessions();
     fetchComments();
     fetchMarketItems();
     fetchEvents();
-    fetchRegisteredUsers();
-
-    const { data: msgData } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
-    if (msgData) setMessages(msgData);
+    fetchRegisteredUsers(email);
+    fetchFriendRequests(email);
+    fetchAcceptedFriends(email);
+    supabase.from('messages').select('*').order('created_at', { ascending: true }).then(({ data }) => { if (data) setMessages(data); });
   };
 
-  const fetchRegisteredUsers = async () => {
+  const fetchRegisteredUsers = async (email: string) => {
     const { data } = await supabase.from('profiles').select('*');
     if (data) {
-      setAllRegisteredUsers(data.filter(u => u.email !== studentEmail));
+      setAllRegisteredUsers(data.filter(u => u.email !== email));
+    }
+  };
+
+  const fetchFriendRequests = async (email: string) => {
+    const { data } = await supabase.from('friend_requests').select('*').eq('receiver_email', email).eq('status', 'pending');
+    if (data) setFriendRequests(data);
+  };
+
+  const fetchAcceptedFriends = async (email: string) => {
+    const { data } = await supabase.from('friend_requests').select('*').eq('status', 'accepted').or(`sender_email.eq.${email},receiver_email.eq.${email}`);
+    if (data) {
+      const friendsList = data.map(req => {
+        const friendEmail = req.sender_email === email ? req.receiver_email : req.sender_email;
+        const friendName = req.sender_email === email ? req.receiver_name : req.sender_name;
+        return {
+          id: req.id,
+          email: friendEmail,
+          name: friendName,
+          initials: friendName.slice(0, 2).toUpperCase()
+        };
+      });
+      setChatPeers(friendsList);
     }
   };
 
@@ -237,9 +230,10 @@ export default function MBMChatWorkspace() {
         .upsert({
           id: session.user.id,
           bio: studentBio,
-          interests: studentInterests
+          branch,
+          year
         });
-      alert('Bio updated successfully in database!');
+      alert('Bio & profile updated successfully!');
     }
     setSavingBio(false);
   };
@@ -259,33 +253,51 @@ export default function MBMChatWorkspace() {
     return <span className="font-bold text-white">{authorName || 'Student'}</span>;
   };
 
-  // Add Friends from Registered Users List
-  const handleAddFriendClick = (userProfile: any) => {
-    const peerObj = {
-      id: userProfile.id,
-      name: userProfile.full_name || userProfile.name || 'Student',
-      branch: userProfile.branch,
-      initials: (userProfile.full_name || userProfile.name || 'St').slice(0, 2).toUpperCase()
-    };
+  // Send Friend Request
+  const handleSendFriendRequest = async (targetUser: any) => {
+    const targetEmail = targetUser.email;
+    const targetName = targetUser.full_name || targetUser.name || 'Student';
 
-    if (chatPeers.some(p => p.id === peerObj.id)) {
-      alert('Friend already added in chat list.');
+    if (targetEmail === studentEmail) {
+      alert('Aap khud ko friend request nahi bhej sakte.');
       return;
     }
 
-    setChatPeers(prev => [peerObj, ...prev]);
-    setShowAddFriendModal(false);
-    setSelectedPeer(peerObj);
-    setActiveTab('chats');
-    alert(`Friend request accepted & added ${peerObj.name} to chats!`);
+    const { error } = await supabase.from('friend_requests').insert([
+      {
+        sender_email: studentEmail,
+        sender_name: studentName || 'Student',
+        receiver_email: targetEmail,
+        receiver_name: targetName,
+        status: 'pending'
+      }
+    ]);
+
+    if (error) {
+      alert('Request already sent or error: ' + error.message);
+    } else {
+      alert(`Friend request successfully sent to ${targetName}!`);
+      setShowAddFriendModal(false);
+    }
   };
 
-  const handleRemoveFriend = (friendId: string, friendName: string) => {
-    if (!confirm(`Remove ${friendName} from your chats?`)) return;
-    setChatPeers(prev => prev.filter(p => p.id !== friendId));
-    if (selectedPeer?.id === friendId) {
-      setSelectedPeer(null);
+  // Accept Friend Request
+  const handleAcceptRequest = async (reqId: string) => {
+    const { error } = await supabase.from('friend_requests').update({ status: 'accepted' }).eq('id', reqId);
+    if (!error) {
+      alert('Friend request accepted! Now chat is unlocked.');
+      fetchFriendRequests(studentEmail);
+      fetchAcceptedFriends(studentEmail);
+    } else {
+      alert('Failed to accept: ' + error.message);
     }
+  };
+
+  const handleRemoveFriend = async (friendEmail: string, friendName: string) => {
+    if (!confirm(`Remove ${friendName} from chats?`)) return;
+    await supabase.from('friend_requests').delete().or(`and(sender_email.eq.${studentEmail},receiver_email.eq.${friendEmail}),and(sender_email.eq.${friendEmail},receiver_email.eq.${studentEmail})`);
+    setChatPeers(prev => prev.filter(p => p.email !== friendEmail));
+    if (selectedPeer?.email === friendEmail) setSelectedPeer(null);
   };
 
   // Send P2P Message
@@ -306,10 +318,10 @@ export default function MBMChatWorkspace() {
 
   // Report Content or User
   const handleReport = async (contentType: 'post' | 'confession' | 'snap' | 'market' | 'event' | 'user', targetId: string) => {
-    const reason = prompt(`Report this ${contentType}? Please provide reason (harassment, spam, abuse):`);
+    const reason = prompt(`Report this ${contentType}? Please provide reason:`);
     if (!reason || !reason.trim()) return;
 
-    const { error } = await supabase.from('moderation_reports').insert([
+    await supabase.from('moderation_reports').insert([
       {
         content_type: contentType,
         target_id: targetId,
@@ -317,12 +329,7 @@ export default function MBMChatWorkspace() {
         reported_by: `${studentName} (${rollNo || 'Student'})`
       }
     ]);
-
-    if (error) {
-      alert('Could not submit report: ' + error.message);
-    } else {
-      alert('Report submitted to Admin Desk. Our team will review and take action.');
-    }
+    alert('Report submitted to Admin Desk.');
   };
 
   // Submit Open Post
@@ -354,22 +361,15 @@ export default function MBMChatWorkspace() {
     }
 
     if (!confirm('Are you sure you want to delete this post?')) return;
-
-    const { error } = await supabase.from('posts').delete().eq('id', postId);
-    if (!error) {
-      setPosts(prev => prev.filter(p => p.id !== postId));
-    } else {
-      alert('Delete failed: ' + error.message);
-    }
+    await supabase.from('posts').delete().eq('id', postId);
+    setPosts(prev => prev.filter(p => p.id !== postId));
   };
 
-  // Like a Post
   const handleLikePost = async (postId: string, currentLikes: number) => {
     await supabase.from('posts').update({ likes: (currentLikes || 0) + 1 }).eq('id', postId);
     setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes: (p.likes || 0) + 1 } : p));
   };
 
-  // Submit Comment
   const handleSendComment = async (parentId: string, parentType: 'post' | 'confession') => {
     const draft = commentDrafts[parentId];
     if (!draft || !draft.trim()) return;
@@ -397,7 +397,6 @@ export default function MBMChatWorkspace() {
     });
   };
 
-  // Create Marketplace Listing
   const handleCreateMarketItem = async () => {
     if (!marketTitle.trim() || !marketPrice.trim()) {
       alert('Item title and price are required.');
@@ -414,9 +413,7 @@ export default function MBMChatWorkspace() {
       }
     ]);
 
-    if (error) {
-      alert('Failed to list item: ' + error.message);
-    } else {
+    if (!error) {
       setMarketTitle('');
       setMarketPrice('');
       setMarketContact('');
@@ -425,7 +422,6 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Create University Event
   const handleCreateEvent = async () => {
     if (!eventTitle.trim() || !eventVenue.trim() || !eventDate.trim()) {
       alert('Event title, date, and venue are required.');
@@ -441,9 +437,7 @@ export default function MBMChatWorkspace() {
       }
     ]);
 
-    if (error) {
-      alert('Failed to create event: ' + error.message);
-    } else {
+    if (!error) {
       setEventTitle('');
       setEventDate('');
       setEventVenue('');
@@ -473,10 +467,10 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Secure OTP Step 1: Send 6-Digit OTP
+  // Secure OTP Step 1
   const handleSendRegistrationOtp = async () => {
     if (!studentEmail.trim() || !studentPassword.trim() || !studentName.trim() || !rollNo.trim()) {
-      alert('All registration fields are mandatory (Name, Roll No, Branch, Year, Email, Password).');
+      alert('All registration fields are mandatory.');
       return;
     }
     setAuthLoading(true);
@@ -490,8 +484,7 @@ export default function MBMChatWorkspace() {
           roll_no: rollNo.trim(),
           branch,
           year,
-          bio: `Student in ${branch} (${year}) at MBM University.`,
-          interests: [branch.split(' ')[0], 'Engineering']
+          bio: `Student in ${branch} (${year}) at MBM University.`
         }
       }
     });
@@ -501,15 +494,15 @@ export default function MBMChatWorkspace() {
     if (otpErr) {
       alert('OTP Sending Error: ' + otpErr.message);
     } else {
-      alert(`6-digit verification code email par bhej diya gaya hai (${studentEmail}). Inbox ya Spam check karein!`);
+      alert(`6-digit verification code sent to (${studentEmail}). Check Inbox/Spam!`);
       setAuthStep('otp');
     }
   };
 
-  // Secure OTP Step 2: Verify 6-Digit OTP & Save Exact Profile
+  // Secure OTP Step 2
   const handleVerifyOtp = async () => {
     if (!otpCode.trim()) {
-      alert('Please enter the 6-digit OTP received in your email.');
+      alert('Please enter the 6-digit OTP.');
       return;
     }
     setAuthLoading(true);
@@ -527,9 +520,7 @@ export default function MBMChatWorkspace() {
     }
 
     if (studentPassword.trim()) {
-      await supabase.auth.updateUser({
-        password: studentPassword.trim()
-      });
+      await supabase.auth.updateUser({ password: studentPassword.trim() });
     }
 
     if (verifyData?.user) {
@@ -541,8 +532,7 @@ export default function MBMChatWorkspace() {
         roll_no: rollNo.trim(),
         branch,
         year,
-        bio: `Student in ${branch} (${year}) at MBM University.`,
-        interests: [branch.split(' ')[0], 'Engineering']
+        bio: `Student in ${branch} (${year}) at MBM University.`
       });
     }
 
@@ -558,14 +548,10 @@ export default function MBMChatWorkspace() {
     window.location.reload();
   };
 
-  // Camera Controls
   const startCamera = async (mode: 'user' | 'environment' = cameraFacingMode) => {
     stopCamera();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode },
-        audio: false
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: false });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
       setCameraFacingMode(mode);
@@ -624,16 +610,10 @@ export default function MBMChatWorkspace() {
     if (!confessionDraft.trim()) return;
     const contentToSend = confessionDraft.trim();
     setConfessionDraft('');
-    await supabase.from('confessions').insert([
-      {
-        tag: confessionTag,
-        content: contentToSend,
-        likes: 0
-      }
-    ]);
+    await supabase.from('confessions').insert([{ tag: confessionTag, content: contentToSend, likes: 0 }]);
   };
 
-  // Auth Screen (Secured with OTP)
+  // Auth Screen
   if (!sessionActive) {
     return (
       <div className="min-h-screen bg-[#03060c] text-slate-100 flex flex-col items-center justify-between p-4 sm:p-8 font-sans">
@@ -674,158 +654,76 @@ export default function MBMChatWorkspace() {
                 </div>
 
                 <div className="space-y-3 font-mono text-xs">
-                  {/* Registration Details Form (Step 1) */}
                   {authMode === 'register' && authStep === 'details' && (
                     <>
                       <div>
                         <label className="text-slate-400 text-[11px] mb-1 block">Full Name</label>
-                        <input 
-                          type="text" 
-                          value={studentName}
-                          onChange={e => setStudentName(e.target.value)}
-                          placeholder="e.g. Vineet Kaler" 
-                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                        />
+                        <input type="text" value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="e.g. Vineet Kaler" className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500" />
                       </div>
-
                       <div>
                         <label className="text-slate-400 text-[11px] mb-1 block">Roll Number</label>
-                        <input 
-                          type="text" 
-                          value={rollNo}
-                          onChange={e => setRollNo(e.target.value)}
-                          placeholder="e.g. 23UFIEXXXX" 
-                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                        />
+                        <input type="text" value={rollNo} onChange={e => setRollNo(e.target.value)} placeholder="e.g. 23UFIEXXXX" className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500" />
                       </div>
-
                       <div>
                         <label className="text-slate-400 text-[11px] mb-1 block">Department / Branch</label>
-                        <select 
-                          value={branch}
-                          onChange={e => setBranch(e.target.value)}
-                          className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2.5 py-2.5 text-white text-xs outline-none focus:border-indigo-500"
-                        >
-                          {MBM_BRANCHES.map(b => (
-                            <option key={b} value={b}>{b}</option>
-                          ))}
+                        <select value={branch} onChange={e => setBranch(e.target.value)} className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2.5 py-2.5 text-white text-xs outline-none focus:border-indigo-500">
+                          {MBM_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
                         </select>
                       </div>
-
                       <div>
                         <label className="text-slate-400 text-[11px] mb-1 block">Academic Year</label>
-                        <select 
-                          value={year}
-                          onChange={e => setYear(e.target.value)}
-                          className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2.5 py-2.5 text-white text-xs outline-none focus:border-indigo-500"
-                        >
+                        <select value={year} onChange={e => setYear(e.target.value)} className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2.5 py-2.5 text-white text-xs outline-none focus:border-indigo-500">
                           <option value="1st Year">1st Year</option>
                           <option value="2nd Year">2nd Year</option>
                           <option value="3rd Year">3rd Year</option>
                           <option value="4th Year">4th Year</option>
                         </select>
                       </div>
-
                       <div>
                         <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
-                        <input 
-                          type="email" 
-                          value={studentEmail}
-                          onChange={e => setStudentEmail(e.target.value)}
-                          placeholder="student@example.com" 
-                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                        />
+                        <input type="email" value={studentEmail} onChange={e => setStudentEmail(e.target.value)} placeholder="student@example.com" className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500" />
                       </div>
-
                       <div>
                         <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
-                        <input 
-                          type="password" 
-                          value={studentPassword}
-                          onChange={e => setStudentPassword(e.target.value)}
-                          placeholder="••••••••" 
-                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                        />
+                        <input type="password" value={studentPassword} onChange={e => setStudentPassword(e.target.value)} placeholder="••••••••" className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500" />
                       </div>
-
-                      <button 
-                        onClick={handleSendRegistrationOtp}
-                        disabled={authLoading}
-                        className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
-                      >
+                      <button onClick={handleSendRegistrationOtp} disabled={authLoading} className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition">
                         <span>{authLoading ? 'Sending OTP...' : 'Send 6-Digit OTP →'}</span>
                         <ArrowRight className="w-4 h-4" />
                       </button>
                     </>
                   )}
 
-                  {/* OTP Verification Screen (Step 2) */}
                   {authMode === 'register' && authStep === 'otp' && (
                     <div className="space-y-4">
                       <div className="p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-center">
                         <p className="text-xs text-indigo-300">OTP code sent to:</p>
                         <p className="font-bold text-white text-xs mt-0.5">{studentEmail}</p>
                       </div>
-
                       <div>
                         <label className="text-slate-400 text-[11px] mb-1 block">Enter 6-Digit Email OTP</label>
-                        <input 
-                          type="text" 
-                          maxLength={8}
-                          value={otpCode}
-                          onChange={e => setOtpCode(e.target.value)}
-                          placeholder="Enter 6-digit OTP" 
-                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-center tracking-widest text-lg font-bold text-cyan-400 outline-none focus:border-indigo-500"
-                        />
+                        <input type="text" maxLength={8} value={otpCode} onChange={e => setOtpCode(e.target.value)} placeholder="Enter 6-digit OTP" className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-center tracking-widest text-lg font-bold text-cyan-400 outline-none focus:border-indigo-500" />
                       </div>
-
-                      <button 
-                        onClick={handleVerifyOtp}
-                        disabled={authLoading}
-                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
-                      >
+                      <button onClick={handleVerifyOtp} disabled={authLoading} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition">
                         <span>{authLoading ? 'Verifying OTP...' : 'Verify OTP & Enter Campus Portal'}</span>
                       </button>
-
-                      <button 
-                        onClick={() => setAuthStep('details')}
-                        className="w-full text-center text-[11px] text-slate-400 hover:text-white pt-1"
-                      >
+                      <button onClick={() => setAuthStep('details')} className="w-full text-center text-[11px] text-slate-400 hover:text-white pt-1">
                         ← Back to Details / Change Email
                       </button>
                     </div>
                   )}
 
-                  {/* Login Form */}
                   {authMode === 'login' && (
                     <>
                       <div>
                         <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
-                        <input 
-                          type="email" 
-                          value={studentEmail}
-                          onChange={e => setStudentEmail(e.target.value)}
-                          placeholder="student@example.com" 
-                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                        />
+                        <input type="email" value={studentEmail} onChange={e => setStudentEmail(e.target.value)} placeholder="student@example.com" className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500" />
                       </div>
-
                       <div>
                         <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
-                        <input 
-                          type="password" 
-                          value={studentPassword}
-                          onChange={e => setStudentPassword(e.target.value)}
-                          placeholder="••••••••" 
-                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                        />
+                        <input type="password" value={studentPassword} onChange={e => setStudentPassword(e.target.value)} placeholder="••••••••" className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500" />
                       </div>
-
-                      <button 
-                        onClick={handlePasswordLogin}
-                        disabled={authLoading}
-                        className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
-                      >
+                      <button onClick={handlePasswordLogin} disabled={authLoading} className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition">
                         <span>{authLoading ? 'Verifying...' : 'Sign In'}</span>
                         <ArrowRight className="w-4 h-4" />
                       </button>
@@ -837,7 +735,6 @@ export default function MBMChatWorkspace() {
           </div>
         </div>
 
-        {/* Footer on Auth Page */}
         <footer className="w-full py-4 text-center font-mono text-[11px] text-slate-500 border-t border-white/5 space-y-1 mt-6">
           <p>© 2026 MBM Students only. All rights reserved. T&C Applied.</p>
           <p className="text-indigo-400">Developed by Vineet Kaler</p>
@@ -858,18 +755,21 @@ export default function MBMChatWorkspace() {
 
           <div className="flex items-center gap-3 font-mono text-xs">
             {ADMIN_EMAILS.includes(studentEmail) && (
-              <a
-                href="/admin"
-                className="px-2.5 py-1 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 font-bold text-[10px] hover:bg-rose-900 transition"
-              >
+              <a href="/admin" className="px-2.5 py-1 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 font-bold text-[10px] hover:bg-rose-900 transition">
                 Admin Desk
               </a>
             )}
 
-            <button 
-              onClick={() => setActiveTab('profile')}
-              className="px-3 py-1 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 flex items-center gap-2 transition"
-            >
+            <button onClick={() => setActiveTab('notifications')} className="relative p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition" title="Notifications">
+              <Bell className="w-4 h-4" />
+              {friendRequests.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+                  {friendRequests.length}
+                </span>
+              )}
+            </button>
+
+            <button onClick={() => setActiveTab('profile')} className="px-3 py-1 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 flex items-center gap-2 transition">
               {renderAuthorName(studentName, studentEmail)}
             </button>
             <button onClick={handleLogout} className="text-slate-500 hover:text-rose-400 p-1" title="Sign out">
@@ -890,6 +790,7 @@ export default function MBMChatWorkspace() {
                 { id: 'feed', label: 'Student Opinions', icon: MessageCircle },
                 { id: 'confessions', label: 'Confessions', icon: Lock },
                 { id: 'chats', label: 'Classmate Chats', icon: MessageSquare, badge: chatPeers.length },
+                { id: 'notifications', label: 'Friend Requests', icon: Bell, badge: friendRequests.length },
                 { id: 'wall', label: 'Campus Wall & Snaps', icon: Camera },
                 { id: 'market', label: 'Marketplace', icon: ShoppingBag, badge: marketItems.length },
                 { id: 'events', label: 'Events Hub', icon: Calendar, badge: eventsList.length },
@@ -909,7 +810,7 @@ export default function MBMChatWorkspace() {
                     <span>{item.label}</span>
                   </div>
                   {item.badge !== undefined && item.badge > 0 && (
-                    <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded-md text-slate-300">
+                    <span className="text-[9px] bg-rose-600 px-1.5 py-0.5 rounded-md text-white font-bold">
                       {item.badge}
                     </span>
                   )}
@@ -917,10 +818,7 @@ export default function MBMChatWorkspace() {
               ))}
             </div>
 
-            <div 
-              onClick={() => setActiveTab('profile')}
-              className="p-3 rounded-2xl bg-[#070b14] border border-white/5 hover:border-white/20 cursor-pointer flex items-center gap-3 transition"
-            >
+            <div onClick={() => setActiveTab('profile')} className="p-3 rounded-2xl bg-[#070b14] border border-white/5 hover:border-white/20 cursor-pointer flex items-center gap-3 transition">
               <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center font-bold text-white text-xs">
                 {studentName ? studentName.slice(0, 2).toUpperCase() : 'MB'}
               </div>
@@ -962,31 +860,16 @@ export default function MBMChatWorkspace() {
                 <div className="p-5 rounded-3xl bg-[#070b14] border border-white/5 space-y-3 font-mono text-xs">
                   <div className="text-[10px] uppercase text-slate-500 font-bold tracking-wider">Campus Bio</div>
                   <p className="text-slate-300 text-sm italic font-sans">"{studentBio}"</p>
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {studentInterests.map((interest, idx) => (
-                      <span key={idx} className="px-2.5 py-1 rounded-lg bg-indigo-950 border border-indigo-800 text-indigo-300 text-[10px]">
-                        #{interest}
-                      </span>
-                    ))}
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* TAB: STUDENT OPEN OPINIONS & POSTS */}
+            {/* TAB: STUDENT OPINIONS */}
             {activeTab === 'feed' && (
               <div className="space-y-4 font-sans">
                 <div className="p-4 rounded-2xl bg-[#070b14] border border-white/10 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-slate-400">Share Campus Opinion</span>
-                  </div>
-                  <textarea 
-                    rows={3} 
-                    value={postDraft}
-                    onChange={e => setPostDraft(e.target.value)}
-                    placeholder="What's your opinion on college labs, events, or mess?" 
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 resize-none"
-                  />
+                  <span className="text-xs font-mono font-bold text-slate-400">Share Campus Opinion</span>
+                  <textarea rows={3} value={postDraft} onChange={e => setPostDraft(e.target.value)} placeholder="What's your opinion on college labs, events, or mess?" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 resize-none" />
                   <div className="flex justify-end">
                     <button onClick={submitPost} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold rounded-xl shadow transition flex items-center gap-1.5">
                       <span>Post Opinion</span>
@@ -1007,85 +890,28 @@ export default function MBMChatWorkspace() {
                             {renderAuthorName(post.author_name, post.author_email)}
                             <div className="text-[10px] font-mono text-slate-500">{post.branch} • {post.year}</div>
                           </div>
-
                           <div className="flex items-center gap-1.5">
                             {isAuthorOrAdmin && (
-                              <button
-                                onClick={() => handleDeletePost(post.id, post.author_email)}
-                                className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
-                                title="Delete this post"
-                              >
+                              <button onClick={() => handleDeletePost(post.id, post.author_email)} className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg" title="Delete">
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             )}
-                            <button
-                              onClick={() => handleReport('post', post.id)}
-                              className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg hover:bg-white/5 transition"
-                              title="Report post to Admin Desk"
-                            >
+                            <button onClick={() => handleReport('post', post.id)} className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg" title="Report">
                               <Flag className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
-
                         <p className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap">{post.content}</p>
-
                         <div className="flex items-center gap-4 pt-2 border-t border-white/5 text-xs font-mono text-slate-400">
-                          <button 
-                            onClick={() => handleLikePost(post.id, post.likes)} 
-                            className="flex items-center gap-1.5 hover:text-rose-400 transition"
-                          >
+                          <button onClick={() => handleLikePost(post.id, post.likes)} className="flex items-center gap-1.5 hover:text-rose-400 transition">
                             <Heart className={`w-4 h-4 ${post.likes > 0 ? 'text-rose-500 fill-rose-500' : ''}`} />
                             <span>{post.likes || 0}</span>
                           </button>
-
-                          <button 
-                            onClick={() => setActiveCommentBox(activeCommentBox === post.id ? null : post.id)} 
-                            className="flex items-center gap-1.5 hover:text-cyan-400 transition"
-                          >
+                          <button onClick={() => setActiveCommentBox(activeCommentBox === post.id ? null : post.id)} className="flex items-center gap-1.5 hover:text-cyan-400 transition">
                             <MessageCircle className="w-4 h-4" />
                             <span>{postComments.length} Comments</span>
                           </button>
                         </div>
-
-                        {activeCommentBox === post.id && (
-                          <div className="pt-3 space-y-2 border-t border-white/5">
-                            {postComments.map(c => (
-                              <div key={c.id} className="p-2.5 rounded-xl bg-black/40 border border-white/5 text-xs flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    {renderAuthorName(c.author_name, c.author_email)}
-                                  </div>
-                                  <p className="text-slate-300 font-sans text-xs">{renderCommentText(c.comment_text)}</p>
-                                </div>
-                                <button
-                                  onClick={() => handleReport('post', c.id)}
-                                  className="text-slate-600 hover:text-amber-400 p-1"
-                                  title="Report comment"
-                                >
-                                  <Flag className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ))}
-
-                            <div className="flex gap-2 pt-2">
-                              <input
-                                type="text"
-                                value={commentDrafts[post.id] || ''}
-                                onChange={e => setCommentDrafts({ ...commentDrafts, [post.id]: e.target.value })}
-                                onKeyDown={e => e.key === 'Enter' && handleSendComment(post.id, 'post')}
-                                placeholder="Add a comment... (Type @name to tag a peer)"
-                                className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-indigo-500 font-sans"
-                              />
-                              <button 
-                                onClick={() => handleSendComment(post.id, 'post')} 
-                                className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs"
-                              >
-                                <Send className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -1102,28 +928,17 @@ export default function MBMChatWorkspace() {
                   </div>
                   <div>
                     <h3 className="text-sm font-black font-mono text-white">Campus Confessions</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Anonymous messages. Comments can tag friends.</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Anonymous messages.</p>
                   </div>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-[#070b14] border border-white/10 space-y-2.5">
-                  <textarea 
-                    rows={2} 
-                    value={confessionDraft}
-                    onChange={e => setConfessionDraft(e.target.value)}
-                    placeholder="Share an anonymous confession or story..." 
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-600 outline-none focus:border-purple-500 resize-none"
-                  />
+                  <textarea rows={2} value={confessionDraft} onChange={e => setConfessionDraft(e.target.value)} placeholder="Share an anonymous confession..." className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-600 outline-none focus:border-purple-500 resize-none" />
                   <div className="flex items-center justify-between">
-                    <select 
-                      value={confessionTag}
-                      onChange={e => setConfessionTag(e.target.value)}
-                      className="bg-black/60 border border-white/10 rounded-lg text-[10px] font-mono text-purple-300 px-2.5 py-1 outline-none"
-                    >
+                    <select value={confessionTag} onChange={e => setConfessionTag(e.target.value)} className="bg-black/60 border border-white/10 rounded-lg text-[10px] font-mono text-purple-300 px-2.5 py-1 outline-none">
                       <option value="General">General</option>
                       <option value="Academics">Academics</option>
                       <option value="Hostel">Hostel</option>
-                      <option value="Department">Department</option>
                     </select>
                     <button onClick={submitConfession} className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-bold rounded-xl shadow transition">
                       Post Anonymously
@@ -1132,82 +947,25 @@ export default function MBMChatWorkspace() {
                 </div>
 
                 <div className="space-y-3">
-                  {confessions.map(c => {
-                    const confComments = comments.filter(comm => comm.parent_id === c.id);
-                    return (
-                      <div key={c.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 space-y-2">
-                        <div className="flex justify-between items-center text-[10px] font-mono">
-                          <span className="text-purple-400 font-bold flex items-center gap-1">
-                            <Lock className="w-3 h-3" /> Anonymous • {c.tag}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleReport('confession', c.id)}
-                              className="text-slate-500 hover:text-rose-400 p-1"
-                              title="Report Confession"
-                            >
-                              <Flag className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                        <p className="text-xs text-slate-200">{c.content}</p>
-
-                        <div className="pt-2 border-t border-white/5 flex items-center gap-3">
-                          <button 
-                            onClick={() => setActiveCommentBox(activeCommentBox === c.id ? null : c.id)}
-                            className="text-[11px] font-mono text-slate-400 hover:text-purple-300 flex items-center gap-1"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            <span>{confComments.length} Comments</span>
-                          </button>
-                        </div>
-
-                        {activeCommentBox === c.id && (
-                          <div className="pt-2 space-y-2 border-t border-white/5">
-                            {confComments.map(com => (
-                              <div key={com.id} className="p-2 rounded-xl bg-black/40 border border-white/5 text-xs">
-                                <span className="text-[10px] text-purple-400 font-mono block">Peer:</span>
-                                <p className="text-slate-300 font-sans text-xs">{renderCommentText(com.comment_text)}</p>
-                              </div>
-                            ))}
-
-                            <div className="flex gap-2 pt-1">
-                              <input
-                                type="text"
-                                value={commentDrafts[c.id] || ''}
-                                onChange={e => setCommentDrafts({ ...commentDrafts, [c.id]: e.target.value })}
-                                onKeyDown={e => e.key === 'Enter' && handleSendComment(c.id, 'confession')}
-                                placeholder="Comment anonymously... (Use @Name to mention)"
-                                className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-purple-500 font-sans"
-                              />
-                              <button 
-                                onClick={() => handleSendComment(c.id, 'confession')} 
-                                className="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs"
-                              >
-                                <Send className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {confessions.map(c => (
+                    <div key={c.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 space-y-2">
+                      <span className="text-[10px] font-mono text-purple-400 font-bold block">Anonymous • {c.tag}</span>
+                      <p className="text-xs text-slate-200">{c.content}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* TAB: CHATS (ADD FRIENDS / SELECT FROM REGISTERED USERS) */}
+            {/* TAB: CHATS */}
             {activeTab === 'chats' && (
               <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-bold font-mono text-white">Direct P2P Chats</h2>
-                    <p className="text-xs text-slate-400 font-mono">Connect and chat with registered classmates.</p>
+                    <h2 className="text-base font-bold font-mono text-white">Classmate Chats</h2>
+                    <p className="text-xs text-slate-400 font-mono">Chat with accepted connections.</p>
                   </div>
-                  <button 
-                    onClick={() => setShowAddFriendModal(true)} 
-                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
-                  >
+                  <button onClick={() => setShowAddFriendModal(true)} className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow">
                     <UserPlus className="w-3.5 h-3.5" />
                     <span>Add Friends</span>
                   </button>
@@ -1216,8 +974,8 @@ export default function MBMChatWorkspace() {
                 {chatPeers.length === 0 ? (
                   <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
                     <MessageSquare className="w-10 h-10 text-slate-700 mx-auto mb-1" />
-                    <h4 className="text-sm font-bold text-slate-300">No active chat friends</h4>
-                    <p className="text-xs text-slate-500">Click "Add Friends" above to pick registered users from campus directory.</p>
+                    <h4 className="text-sm font-bold text-slate-300">No active chat connections</h4>
+                    <p className="text-xs text-slate-500">Send friend requests via "Add Friends". Chat unlocks once accepted!</p>
                   </div>
                 ) : selectedPeer ? (
                   <div className="h-[70vh] rounded-3xl bg-[#070b14] border border-white/10 flex flex-col justify-between overflow-hidden shadow-xl">
@@ -1228,15 +986,11 @@ export default function MBMChatWorkspace() {
                         </div>
                         <div>
                           <div className="text-xs font-bold text-white">{selectedPeer.name}</div>
-                          <div className="text-[10px] font-mono text-emerald-400">P2P Secure Channel</div>
+                          <div className="text-[10px] font-mono text-emerald-400">Connected P2P</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => handleRemoveFriend(selectedPeer.id, selectedPeer.name)}
-                          className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
-                          title="Remove friend"
-                        >
+                        <button onClick={() => handleRemoveFriend(selectedPeer.email, selectedPeer.name)} className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg" title="Remove">
                           <UserMinus className="w-4 h-4" />
                         </button>
                         <button onClick={() => setSelectedPeer(null)} className="p-1 text-slate-500 hover:text-white">
@@ -1252,23 +1006,13 @@ export default function MBMChatWorkspace() {
                           <div key={m.id} className={`flex ${m.sender_name === studentName ? 'justify-end' : 'justify-start'}`}>
                             <div className={`p-3 rounded-2xl max-w-[80%] ${m.sender_name === studentName ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-[#0f1523] border border-white/10 text-slate-200 rounded-tl-none'}`}>
                               <p>{m.text}</p>
-                              <span className="text-[9px] font-mono opacity-60 block text-right mt-1">
-                                {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
                             </div>
                           </div>
                         ))}
                     </div>
 
                     <div className="p-2.5 border-t border-white/5 flex items-center gap-2 bg-black/30">
-                      <input 
-                        type="text" 
-                        value={chatDraft}
-                        onChange={e => setChatDraft(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && sendP2PMessage()}
-                        placeholder={`Message ${selectedPeer.name}...`}
-                        className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500 font-sans"
-                      />
+                      <input type="text" value={chatDraft} onChange={e => setChatDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendP2PMessage()} placeholder={`Message ${selectedPeer.name}...`} className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500 font-sans" />
                       <button onClick={sendP2PMessage} className="p-2 bg-indigo-600 text-white rounded-xl">
                         <Send className="w-4 h-4" />
                       </button>
@@ -1277,29 +1021,19 @@ export default function MBMChatWorkspace() {
                 ) : (
                   <div className="space-y-2">
                     {chatPeers.map(p => (
-                      <div key={p.id} className="p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/5 border border-white/5 flex items-center justify-between transition">
+                      <div key={p.email} className="p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/5 border border-white/5 flex items-center justify-between transition">
                         <div onClick={() => setSelectedPeer(p)} className="flex items-center gap-3 cursor-pointer flex-1">
                           <div className="w-10 h-10 rounded-full bg-indigo-950 text-indigo-300 flex items-center justify-center font-mono font-bold text-xs">
                             {p.initials}
                           </div>
                           <div>
                             <div className="text-xs font-bold text-white">{p.name}</div>
-                            <div className="text-[10px] text-slate-500 font-mono">Tap to open P2P chat</div>
+                            <div className="text-[10px] text-slate-500 font-mono">Tap to open chat</div>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => handleRemoveFriend(p.id, p.name)}
-                            className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
-                            title="Remove friend"
-                          >
-                            <UserMinus className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => setSelectedPeer(p)} className="text-xs font-mono text-cyan-400 hover:underline">
-                            Chat →
-                          </button>
-                        </div>
+                        <button onClick={() => setSelectedPeer(p)} className="text-xs font-mono text-cyan-400 hover:underline">
+                          Chat →
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -1307,49 +1041,58 @@ export default function MBMChatWorkspace() {
               </div>
             )}
 
-            {/* TAB: CAMPUS WALL & SNAPS */}
+            {/* TAB: NOTIFICATIONS */}
+            {activeTab === 'notifications' && (
+              <div className="space-y-4 font-sans">
+                <h2 className="text-base font-bold font-mono text-white flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-cyan-400" />
+                  <span>Friend Requests ({friendRequests.length})</span>
+                </h2>
+
+                {friendRequests.length === 0 ? (
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono text-slate-500 text-xs">
+                    No pending friend requests.
+                  </div>
+                ) : (
+                  <div className="space-y-2 font-mono text-xs">
+                    {friendRequests.map(req => (
+                      <div key={req.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-white text-sm">{req.sender_name}</div>
+                          <div className="text-[10px] text-slate-400">Wants to connect with you</div>
+                        </div>
+                        <button onClick={() => handleAcceptRequest(req.id)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 shadow">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Accept</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB: WALL */}
             {activeTab === 'wall' && (
               <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-base font-bold font-mono text-white">Campus Wall & Snaps</h2>
-                    <p className="text-xs text-slate-400 font-mono">Live departmental photo moments.</p>
-                  </div>
-                  <button 
-                    onClick={() => startCamera()} 
-                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
-                  >
+                  <h2 className="text-base font-bold font-mono text-white">Campus Wall</h2>
+                  <button onClick={() => startCamera()} className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow">
                     <Camera className="w-3.5 h-3.5" />
                     <span>Take Snap</span>
                   </button>
                 </div>
-
                 {publicSnaps.length === 0 ? (
-                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
-                    <Camera className="w-10 h-10 text-amber-400/50 mx-auto mb-1" />
-                    <h4 className="text-sm font-bold text-slate-300">No active snaps on wall</h4>
-                    <p className="text-xs text-slate-500">Tap "Take Snap" above to share the first moment.</p>
-                  </div>
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono text-slate-500 text-xs">No active snaps on wall.</div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {publicSnaps.map(snap => (
-                      <div key={snap.id} className="rounded-2xl overflow-hidden bg-[#070b14] border border-white/10 space-y-2 shadow-xl">
+                      <div key={snap.id} className="rounded-2xl overflow-hidden bg-[#070b14] border border-white/10 space-y-2">
                         <div className="relative aspect-[3/4]">
-                          <img src={snap.imageUrl} alt="Public Snap" className="w-full h-full object-cover" />
-                          <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur border border-white/10 font-mono text-[10px] text-white">
-                            {snap.sender} • {snap.branch}
-                          </div>
-                          <button
-                            onClick={() => handleReport('snap', snap.id)}
-                            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-slate-300 hover:text-rose-400"
-                            title="Report Snap"
-                          >
-                            <Flag className="w-3.5 h-3.5" />
-                          </button>
+                          <img src={snap.imageUrl} alt="Snap" className="w-full h-full object-cover" />
                         </div>
-                        <div className="p-3 font-mono text-xs flex justify-between items-center">
-                          <span className="text-slate-300">{snap.caption}</span>
-                          <span className="text-[10px] text-slate-500">{snap.timestamp}</span>
+                        <div className="p-3 font-mono text-xs flex justify-between">
+                          <span>{snap.caption}</span>
                         </div>
                       </div>
                     ))}
@@ -1362,53 +1105,18 @@ export default function MBMChatWorkspace() {
             {activeTab === 'market' && (
               <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-base font-bold font-mono text-white">MBM Student Marketplace</h2>
-                    <p className="text-xs text-slate-400 font-mono">Buy, sell, or rent drafters, lab aprons, books, and calculators.</p>
-                  </div>
-                  <button 
-                    onClick={() => setShowMarketModal(true)} 
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>List Item</span>
-                  </button>
+                  <h2 className="text-base font-bold font-mono text-white">Student Marketplace</h2>
+                  <button onClick={() => setShowMarketModal(true)} className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold rounded-xl">List Item</button>
                 </div>
-
                 {marketItems.length === 0 ? (
-                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
-                    <ShoppingBag className="w-10 h-10 text-emerald-500/50 mx-auto mb-1" />
-                    <h4 className="text-sm font-bold text-slate-300">No items listed yet</h4>
-                    <p className="text-xs text-slate-500">List an engineering drafter, scientific calculator, or notes.</p>
-                  </div>
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono text-slate-500 text-xs">No items listed.</div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {marketItems.map(item => (
                       <div key={item.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 flex flex-col justify-between gap-3">
                         <div>
-                          <div className="flex items-center justify-between">
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-400 font-mono text-[9px] font-bold">
-                              {item.category || 'Supplies'}
-                            </span>
-                            <span className="text-emerald-400 font-mono font-black text-sm">
-                              {item.price}
-                            </span>
-                          </div>
+                          <span className="text-emerald-400 font-mono font-black text-sm">{item.price}</span>
                           <h4 className="text-white font-bold text-sm mt-2">{item.title}</h4>
-                          <div className="text-[11px] text-slate-400 font-mono mt-1">
-                            Seller: {item.seller}
-                          </div>
-                        </div>
-
-                        <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono">
-                          <span className="text-cyan-400">📞 {item.contact || 'Chat in App'}</span>
-                          <button 
-                            onClick={() => handleReport('market', item.id)}
-                            className="text-slate-500 hover:text-amber-400 p-1"
-                            title="Report listing"
-                          >
-                            <Flag className="w-3.5 h-3.5" />
-                          </button>
                         </div>
                       </div>
                     ))}
@@ -1417,50 +1125,20 @@ export default function MBMChatWorkspace() {
               </div>
             )}
 
-            {/* TAB: EVENTS HUB */}
+            {/* TAB: EVENTS */}
             {activeTab === 'events' && (
               <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-base font-bold font-mono text-white">University Events Hub</h2>
-                    <p className="text-xs text-slate-400 font-mono">Workshops, sports meets, cultural fests & departmental guest lectures.</p>
-                  </div>
-                  <button 
-                    onClick={() => setShowEventModal(true)} 
-                    className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Post Event</span>
-                  </button>
+                  <h2 className="text-base font-bold font-mono text-white">Events Hub</h2>
+                  <button onClick={() => setShowEventModal(true)} className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold rounded-xl">Post Event</button>
                 </div>
-
                 {eventsList.length === 0 ? (
-                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
-                    <Calendar className="w-10 h-10 text-cyan-500/50 mx-auto mb-1" />
-                    <h4 className="text-sm font-bold text-slate-300">No scheduled events right now</h4>
-                    <p className="text-xs text-slate-500">Be the first to announce a club meetup or departmental workshop.</p>
-                  </div>
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono text-slate-500 text-xs">No events.</div>
                 ) : (
                   <div className="space-y-3">
                     {eventsList.map(ev => (
-                      <div key={ev.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <h4 className="text-white font-bold text-sm">{ev.title}</h4>
-                          <div className="text-[11px] font-mono text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
-                            <span>📅 {ev.date}</span>
-                            <span>📍 {ev.venue}</span>
-                            {ev.organizer && <span>🏛️ By: {ev.organizer}</span>}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button 
-                            onClick={() => handleReport('event', ev.id)}
-                            className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg hover:bg-white/5 transition"
-                            title="Report event"
-                          >
-                            <Flag className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                      <div key={ev.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 flex justify-between">
+                        <h4 className="text-white font-bold text-sm">{ev.title}</h4>
                       </div>
                     ))}
                   </div>
@@ -1485,20 +1163,10 @@ export default function MBMChatWorkspace() {
 
                   <div className="space-y-3 pt-3 border-t border-white/5">
                     <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Campus Bio (Persisted in DB)</label>
-                      <textarea 
-                        rows={3} 
-                        value={studentBio}
-                        onChange={e => setStudentBio(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs outline-none focus:border-indigo-500"
-                      />
+                      <label className="text-slate-400 text-[11px] mb-1 block">Campus Bio</label>
+                      <textarea rows={3} value={studentBio} onChange={e => setStudentBio(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs outline-none focus:border-indigo-500" />
                     </div>
-
-                    <button 
-                      onClick={handleSaveBio}
-                      disabled={savingBio}
-                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl mt-3 transition"
-                    >
+                    <button onClick={handleSaveBio} disabled={savingBio} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl mt-3 transition">
                       <span>{savingBio ? 'Saving...' : 'Save & Persist Changes'}</span>
                     </button>
                   </div>
@@ -1516,16 +1184,7 @@ export default function MBMChatWorkspace() {
                       <div className="text-white font-bold">{studentName}</div>
                       <div className="text-slate-400 text-[11px]">{studentEmail} • {rollNo}</div>
                     </div>
-                    <button onClick={handleLogout} className="px-3 py-1.5 bg-rose-950 border border-rose-800 text-rose-300 rounded-xl">
-                      Sign Out
-                    </button>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <div>
-                      <div className="text-white font-bold">MBM University Network</div>
-                      <div className="text-slate-400 text-[11px]">{branch} • {year}</div>
-                    </div>
-                    <span className="text-emerald-400 font-bold text-[10px]">CONNECTED</span>
+                    <button onClick={handleLogout} className="px-3 py-1.5 bg-rose-950 border border-rose-800 text-rose-300 rounded-xl">Sign Out</button>
                   </div>
                 </div>
               </div>
@@ -1561,7 +1220,7 @@ export default function MBMChatWorkspace() {
         <p className="text-indigo-400">Developed by Vineet Kaler</p>
       </footer>
 
-      {/* Modal: Add Friends from Registered Users Directory */}
+      {/* Modal: Add Friends Directory */}
       {showAddFriendModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
           <div className="max-w-md w-full rounded-3xl bg-[#070b14] border border-white/10 p-6 space-y-4 shadow-2xl">
@@ -1588,10 +1247,10 @@ export default function MBMChatWorkspace() {
                       <div className="text-[10px] text-cyan-400">{user.branch} • {user.year}</div>
                     </div>
                     <button 
-                      onClick={() => handleAddFriendClick(user)}
+                      onClick={() => handleSendFriendRequest(user)}
                       className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-bold"
                     >
-                      Connect / Add
+                      Send Request
                     </button>
                   </div>
                 ))
