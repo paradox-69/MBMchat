@@ -36,7 +36,7 @@ export default function MBMChatWorkspace() {
     'market' | 'events' | 'settings' | 'profile'
   >('home');
 
-  // Authentication State (OTP Flow untouched & secure)
+  // Authentication State (OTP secure flow untouched)
   const [sessionActive, setSessionActive] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authStep, setAuthStep] = useState<'details' | 'otp'>('details');
@@ -51,9 +51,9 @@ export default function MBMChatWorkspace() {
   const [year, setYear] = useState('1st Year');
   const [otpCode, setOtpCode] = useState('');
 
-  // Profile Customization & Persistence
-  const [studentBio, setStudentBio] = useState('Mining Engineering student at MBM University.');
-  const [studentInterests, setStudentInterests] = useState<string[]>(['Mining', 'Fieldwork', 'Reading']);
+  // Profile Customization (Exact registration data)
+  const [studentBio, setStudentBio] = useState('Student at MBM University.');
+  const [studentInterests, setStudentInterests] = useState<string[]>(['Campus', 'Engineering']);
   const [savingBio, setSavingBio] = useState(false);
 
   // Camera & Visual Snaps
@@ -65,8 +65,10 @@ export default function MBMChatWorkspace() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Live Database Stores & Add Friends / P2P Chat State
+  // Friends & P2P Chat State
   const [chatPeers, setChatPeers] = useState<any[]>([]);
+  const [allRegisteredUsers, setAllRegisteredUsers] = useState<any[]>([]);
+  const [showAddFriendModal, setShowAddFriendModal] = useState(false);
   const [selectedPeer, setSelectedPeer] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [chatDraft, setChatDraft] = useState('');
@@ -100,7 +102,7 @@ export default function MBMChatWorkspace() {
   const [eventDate, setEventDate] = useState('');
   const [eventVenue, setEventVenue] = useState('');
 
-  // Synchronize Active User Session & Bio on Mount
+  // Synchronize Active User Session & Exact Profile on Mount
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
@@ -187,9 +189,17 @@ export default function MBMChatWorkspace() {
     fetchComments();
     fetchMarketItems();
     fetchEvents();
+    fetchRegisteredUsers();
 
     const { data: msgData } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
     if (msgData) setMessages(msgData);
+  };
+
+  const fetchRegisteredUsers = async () => {
+    const { data } = await supabase.from('profiles').select('*');
+    if (data) {
+      setAllRegisteredUsers(data.filter(u => u.email !== studentEmail));
+    }
   };
 
   const fetchPosts = async () => {
@@ -249,37 +259,36 @@ export default function MBMChatWorkspace() {
     return <span className="font-bold text-white">{authorName || 'Student'}</span>;
   };
 
-  // Add Friends & P2P Chat Management
-  const handleAddFriend = () => {
-    const friendName = prompt('Enter friend or classmate name to add for P2P chat:');
-    if (!friendName || !friendName.trim()) return;
+  // Add Friends from Registered Users List
+  const handleAddFriendClick = (userProfile: any) => {
+    const peerObj = {
+      id: userProfile.id,
+      name: userProfile.full_name || userProfile.name || 'Student',
+      branch: userProfile.branch,
+      initials: (userProfile.full_name || userProfile.name || 'St').slice(0, 2).toUpperCase()
+    };
 
-    const trimmed = friendName.trim();
-    if (chatPeers.some(p => p.name.toLowerCase() === trimmed.toLowerCase())) {
-      alert('This friend is already in your chat list.');
+    if (chatPeers.some(p => p.id === peerObj.id)) {
+      alert('Friend already added in chat list.');
       return;
     }
 
-    const newFriend = {
-      id: `friend_${Date.now()}`,
-      name: trimmed,
-      initials: trimmed.slice(0, 2).toUpperCase()
-    };
-
-    setChatPeers(prev => [newFriend, ...prev]);
-    setSelectedPeer(newFriend);
+    setChatPeers(prev => [peerObj, ...prev]);
+    setShowAddFriendModal(false);
+    setSelectedPeer(peerObj);
     setActiveTab('chats');
+    alert(`Friend request accepted & added ${peerObj.name} to chats!`);
   };
 
   const handleRemoveFriend = (friendId: string, friendName: string) => {
-    if (!confirm(`Remove ${friendName} from your friends list?`)) return;
+    if (!confirm(`Remove ${friendName} from your chats?`)) return;
     setChatPeers(prev => prev.filter(p => p.id !== friendId));
     if (selectedPeer?.id === friendId) {
       setSelectedPeer(null);
     }
   };
 
-  // Send Direct P2P Message
+  // Send P2P Message
   const sendP2PMessage = async () => {
     if (!chatDraft.trim() || !selectedPeer) return;
     const textToSend = chatDraft.trim();
@@ -481,8 +490,8 @@ export default function MBMChatWorkspace() {
           roll_no: rollNo.trim(),
           branch,
           year,
-          bio: studentBio,
-          interests: studentInterests
+          bio: `Student in ${branch} (${year}) at MBM University.`,
+          interests: [branch.split(' ')[0], 'Engineering']
         }
       }
     });
@@ -497,7 +506,7 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Secure OTP Step 2: Verify 6-Digit OTP & Save Profile
+  // Secure OTP Step 2: Verify 6-Digit OTP & Save Exact Profile
   const handleVerifyOtp = async () => {
     if (!otpCode.trim()) {
       alert('Please enter the 6-digit OTP received in your email.');
@@ -532,8 +541,8 @@ export default function MBMChatWorkspace() {
         roll_no: rollNo.trim(),
         branch,
         year,
-        bio: studentBio,
-        interests: studentInterests
+        bio: `Student in ${branch} (${year}) at MBM University.`,
+        interests: [branch.split(' ')[0], 'Engineering']
       });
     }
 
@@ -830,7 +839,7 @@ export default function MBMChatWorkspace() {
 
         {/* Footer on Auth Page */}
         <footer className="w-full py-4 text-center font-mono text-[11px] text-slate-500 border-t border-white/5 space-y-1 mt-6">
-          <p>© 2026 MBM University. All rights reserved. T&C Applied.</p>
+          <p>© 2026 MBM Students only. All rights reserved. T&C Applied.</p>
           <p className="text-indigo-400">Developed by Vineet Kaler</p>
         </footer>
       </div>
@@ -1187,16 +1196,16 @@ export default function MBMChatWorkspace() {
               </div>
             )}
 
-            {/* TAB: CHATS (ADD FRIENDS & P2P CHAT) */}
+            {/* TAB: CHATS (ADD FRIENDS / SELECT FROM REGISTERED USERS) */}
             {activeTab === 'chats' && (
               <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-base font-bold font-mono text-white">Direct P2P Chats</h2>
-                    <p className="text-xs text-slate-400 font-mono">Add friends and chat securely.</p>
+                    <p className="text-xs text-slate-400 font-mono">Connect and chat with registered classmates.</p>
                   </div>
                   <button 
-                    onClick={handleAddFriend} 
+                    onClick={() => setShowAddFriendModal(true)} 
                     className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
@@ -1207,8 +1216,8 @@ export default function MBMChatWorkspace() {
                 {chatPeers.length === 0 ? (
                   <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
                     <MessageSquare className="w-10 h-10 text-slate-700 mx-auto mb-1" />
-                    <h4 className="text-sm font-bold text-slate-300">No friends added yet</h4>
-                    <p className="text-xs text-slate-500">Click "Add Friends" above to add classmates for direct chatting.</p>
+                    <h4 className="text-sm font-bold text-slate-300">No active chat friends</h4>
+                    <p className="text-xs text-slate-500">Click "Add Friends" above to pick registered users from campus directory.</p>
                   </div>
                 ) : selectedPeer ? (
                   <div className="h-[70vh] rounded-3xl bg-[#070b14] border border-white/10 flex flex-col justify-between overflow-hidden shadow-xl">
@@ -1548,9 +1557,49 @@ export default function MBMChatWorkspace() {
 
       {/* Footer on Main Dashboard */}
       <footer className="w-full py-4 text-center font-mono text-[11px] text-slate-500 border-t border-white/5 space-y-1">
-        <p>© 2026 MBM University. All rights reserved. T&C Applied.</p>
+        <p>© 2026 MBM Students only. All rights reserved. T&C Applied.</p>
         <p className="text-indigo-400">Developed by Vineet Kaler</p>
       </footer>
+
+      {/* Modal: Add Friends from Registered Users Directory */}
+      {showAddFriendModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
+          <div className="max-w-md w-full rounded-3xl bg-[#070b14] border border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold font-mono text-white flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-indigo-400" />
+                <span>Registered MBM Students Directory</span>
+              </h3>
+              <button onClick={() => setShowAddFriendModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs font-mono text-slate-400">Select a registered student to send chat request & connect:</p>
+
+            <div className="max-h-60 overflow-y-auto space-y-2 font-mono text-xs">
+              {allRegisteredUsers.length === 0 ? (
+                <p className="text-slate-500 text-center py-6">No other registered students found.</p>
+              ) : (
+                allRegisteredUsers.map(user => (
+                  <div key={user.id} className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-white">{user.full_name || user.name || 'Student'}</div>
+                      <div className="text-[10px] text-cyan-400">{user.branch} • {user.year}</div>
+                    </div>
+                    <button 
+                      onClick={() => handleAddFriendClick(user)}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-bold"
+                    >
+                      Connect / Add
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: List Marketplace Item */}
       {showMarketModal && (
