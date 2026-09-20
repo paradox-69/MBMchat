@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   Home, MessageSquare, Camera, Compass, Lock, ShoppingBag, 
   Calendar, Settings, Plus, Send, X, 
-  UserPlus, LogOut, ArrowRight, SwitchCamera, User, LogIn,
+  UserPlus, UserMinus, LogOut, ArrowRight, SwitchCamera, User, LogIn,
   Heart, MessageCircle, CheckCircle2, Flag, Trash2, ShieldAlert
 } from 'lucide-react';
 
@@ -64,7 +64,7 @@ export default function MBMChatWorkspace() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Live Database Stores
+  // Live Database Stores & Classmate Contacts (Add/Remove peer)
   const [chatPeers, setChatPeers] = useState<any[]>([]);
   const [selectedPeer, setSelectedPeer] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -163,12 +163,20 @@ export default function MBMChatWorkspace() {
       })
       .subscribe();
 
+    const msgSub = supabase
+      .channel('public:messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+        setMessages(prev => [...prev, payload.new]);
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(postSub);
       supabase.removeChannel(confessionSub);
       supabase.removeChannel(commentSub);
       supabase.removeChannel(marketSub);
       supabase.removeChannel(eventSub);
+      supabase.removeChannel(msgSub);
     };
   }, []);
 
@@ -178,6 +186,9 @@ export default function MBMChatWorkspace() {
     fetchComments();
     fetchMarketItems();
     fetchEvents();
+
+    const { data: msgData } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
+    if (msgData) setMessages(msgData);
   };
 
   const fetchPosts = async () => {
@@ -212,11 +223,11 @@ export default function MBMChatWorkspace() {
     if (session?.user) {
       await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: session.user.id,
           bio: studentBio,
           interests: studentInterests
-        })
-        .eq('id', session.user.id);
+        });
       alert('Bio updated successfully in database!');
     }
     setSavingBio(false);
@@ -224,7 +235,7 @@ export default function MBMChatWorkspace() {
 
   // Helper: Name with Admin Verification Badge
   const renderAuthorName = (authorName: string, authorEmail?: string) => {
-    const isAdmin = (authorEmail && ADMIN_EMAILS.includes(authorEmail)) || authorName.includes('Vineet Kaler');
+    const isAdmin = (authorEmail && ADMIN_EMAILS.includes(authorEmail)) || authorName?.includes('Vineet Kaler');
     if (isAdmin) {
       return (
         <span className="inline-flex items-center gap-1">
@@ -234,7 +245,53 @@ export default function MBMChatWorkspace() {
         </span>
       );
     }
-    return <span className="font-bold text-white">{authorName}</span>;
+    return <span className="font-bold text-white">{authorName || 'Student'}</span>;
+  };
+
+  // Classmate Contacts Management: Add & Remove Peers
+  const handleAddClassmate = () => {
+    const name = prompt('Enter classmate name to start chat:');
+    if (!name || !name.trim()) return;
+
+    const trimmed = name.trim();
+    if (chatPeers.some(p => p.name.toLowerCase() === trimmed.toLowerCase())) {
+      alert('Classmate already in your conversation list.');
+      return;
+    }
+
+    const newPeer = {
+      id: `p_${Date.now()}`,
+      name: trimmed,
+      initials: trimmed.slice(0, 2).toUpperCase()
+    };
+
+    setChatPeers(prev => [newPeer, ...prev]);
+    setSelectedPeer(newPeer);
+    setActiveTab('chats');
+  };
+
+  const handleRemoveClassmate = (peerId: string, peerName: string) => {
+    if (!confirm(`Remove ${peerName} from your classmate list?`)) return;
+    setChatPeers(prev => prev.filter(p => p.id !== peerId));
+    if (selectedPeer?.id === peerId) {
+      setSelectedPeer(null);
+    }
+  };
+
+  // Send Direct Message
+  const sendMessage = async () => {
+    if (!chatDraft.trim() || !selectedPeer) return;
+    const textToSend = chatDraft.trim();
+    setChatDraft('');
+
+    await supabase.from('messages').insert([
+      {
+        sender_name: studentName,
+        receiver_name: selectedPeer.name,
+        text: textToSend,
+        is_snap: false
+      }
+    ]);
   };
 
   // Report Content or User
@@ -406,7 +463,7 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Direct Instant Registration (Bypasses email rate limit error)
+  // Direct Instant Registration (Fault-Tolerant, No Trigger Crash)
   const handleDirectRegister = async () => {
     if (!studentEmail.trim() || !studentPassword.trim() || !studentName.trim() || !rollNo.trim()) {
       alert('All registration fields are mandatory (Name, Roll No, Branch, Year, Email, Password).');
@@ -414,30 +471,35 @@ export default function MBMChatWorkspace() {
     }
     setAuthLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: studentEmail.trim(),
-      password: studentPassword.trim(),
-      options: {
-        data: {
-          full_name: studentName.trim(),
-          roll_no: rollNo.trim(),
-          branch,
-          year,
-          bio: studentBio,
-          interests: studentInterests
-        }
-      }
+      password: studentPassword.trim()
     });
 
-    setAuthLoading(false);
-
-    if (error) {
-      alert('Registration Error: ' + error.message);
-    } else {
-      alert('Registration Successful! Welcome to MBM Campus Portal.');
-      setSessionActive(true);
-      window.location.reload();
+    if (authError) {
+      setAuthLoading(false);
+      alert('Registration Error: ' + authError.message);
+      return;
     }
+
+    if (authData?.user) {
+      await supabase.from('profiles').upsert({
+        id: authData.user.id,
+        email: studentEmail.trim(),
+        full_name: studentName.trim(),
+        name: studentName.trim(),
+        roll_no: rollNo.trim(),
+        branch: branch,
+        year: year,
+        bio: studentBio,
+        interests: studentInterests
+      });
+    }
+
+    setAuthLoading(false);
+    alert('Registration Successful! Welcome to MBM Campus Portal.');
+    setSessionActive(true);
+    window.location.reload();
   };
 
   const handleLogout = async () => {
@@ -732,7 +794,7 @@ export default function MBMChatWorkspace() {
               { id: 'home', label: 'Dashboard', icon: Home },
               { id: 'feed', label: 'Student Opinions', icon: MessageCircle },
               { id: 'confessions', label: 'Confessions', icon: Lock },
-              { id: 'chats', label: 'Classmate Chats', icon: MessageSquare },
+              { id: 'chats', label: 'Classmate Chats', icon: MessageSquare, badge: chatPeers.length },
               { id: 'wall', label: 'Campus Wall & Snaps', icon: Camera },
               { id: 'market', label: 'Marketplace', icon: ShoppingBag, badge: marketItems.length },
               { id: 'events', label: 'Events Hub', icon: Calendar, badge: eventsList.length },
@@ -1039,6 +1101,117 @@ export default function MBMChatWorkspace() {
             </div>
           )}
 
+          {/* TAB: CHATS (ADD / REMOVE CLASSMATES) */}
+          {activeTab === 'chats' && (
+            <div className="space-y-4 font-sans">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold font-mono text-white">Classmate Discussions</h2>
+                  <p className="text-xs text-slate-400 font-mono">Confidential direct messages with your peers.</p>
+                </div>
+                <button 
+                  onClick={handleAddClassmate} 
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Add Classmate</span>
+                </button>
+              </div>
+
+              {chatPeers.length === 0 ? (
+                <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
+                  <MessageSquare className="w-10 h-10 text-slate-700 mx-auto mb-1" />
+                  <h4 className="text-sm font-bold text-slate-300">No active classmates added</h4>
+                  <p className="text-xs text-slate-500">Click "Add Classmate" above to add friends and begin messaging.</p>
+                </div>
+              ) : selectedPeer ? (
+                <div className="h-[70vh] rounded-3xl bg-[#070b14] border border-white/10 flex flex-col justify-between overflow-hidden shadow-xl">
+                  <div className="p-3.5 border-b border-white/5 flex items-center justify-between bg-black/20">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-indigo-950 text-indigo-300 flex items-center justify-center font-mono font-bold text-xs border border-indigo-700">
+                        {selectedPeer.initials}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white">{selectedPeer.name}</div>
+                        <div className="text-[10px] font-mono text-emerald-400">Direct Channel</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleRemoveClassmate(selectedPeer.id, selectedPeer.name)}
+                        className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
+                        title="Remove classmate"
+                      >
+                        <UserMinus className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setSelectedPeer(null)} className="p-1 text-slate-500 hover:text-white">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 flex-1 overflow-y-auto space-y-2 text-xs">
+                    {messages
+                      .filter(m => (m.sender_name === studentName && m.receiver_name === selectedPeer.name) || (m.sender_name === selectedPeer.name && m.receiver_name === studentName))
+                      .map(m => (
+                        <div key={m.id} className={`flex ${m.sender_name === studentName ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`p-3 rounded-2xl max-w-[80%] ${m.sender_name === studentName ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-[#0f1523] border border-white/10 text-slate-200 rounded-tl-none'}`}>
+                            <p>{m.text}</p>
+                            <span className="text-[9px] font-mono opacity-60 block text-right mt-1">
+                              {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+
+                  <div className="p-2.5 border-t border-white/5 flex items-center gap-2 bg-black/30">
+                    <input 
+                      type="text" 
+                      value={chatDraft}
+                      onChange={e => setChatDraft(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                      placeholder={`Send a message to ${selectedPeer.name}...`}
+                      className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500 font-sans"
+                    />
+                    <button onClick={sendMessage} className="p-2 bg-indigo-600 text-white rounded-xl">
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {chatPeers.map(p => (
+                    <div key={p.id} className="p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/5 border border-white/5 flex items-center justify-between transition">
+                      <div onClick={() => setSelectedPeer(p)} className="flex items-center gap-3 cursor-pointer flex-1">
+                        <div className="w-10 h-10 rounded-full bg-indigo-950 text-indigo-300 flex items-center justify-center font-mono font-bold text-xs">
+                          {p.initials}
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white">{p.name}</div>
+                          <div className="text-[10px] text-slate-500 font-mono">Tap to open discussion</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleRemoveClassmate(p.id, p.name)}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
+                          title="Remove classmate"
+                        >
+                          <UserMinus className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setSelectedPeer(p)} className="text-xs font-mono text-cyan-400 hover:underline">
+                          Chat →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TAB: CAMPUS WALL & SNAPS */}
           {activeTab === 'wall' && (
             <div className="space-y-4 font-sans">
@@ -1235,13 +1408,6 @@ export default function MBMChatWorkspace() {
                   </button>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* TAB: CHATS */}
-          {activeTab === 'chats' && (
-            <div className="p-8 text-center border border-dashed border-white/10 rounded-3xl text-slate-500 font-mono text-xs">
-              Direct discussions with classmates remain confidential.
             </div>
           )}
 
