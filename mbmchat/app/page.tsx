@@ -86,8 +86,20 @@ export default function MBMChatWorkspace() {
   const [commentDrafts, setCommentDrafts] = useState<{ [key: string]: string }>({});
   const [activeCommentBox, setActiveCommentBox] = useState<string | null>(null);
 
+  // Marketplace Stores & Form State
   const [marketItems, setMarketItems] = useState<any[]>([]);
+  const [showMarketModal, setShowMarketModal] = useState(false);
+  const [marketTitle, setMarketTitle] = useState('');
+  const [marketPrice, setMarketPrice] = useState('');
+  const [marketCategory, setMarketCategory] = useState('Drafters & Tools');
+  const [marketContact, setMarketContact] = useState('');
+
+  // Events Stores & Form State
   const [eventsList, setEventsList] = useState<any[]>([]);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventDate, setEventDate] = useState('');
+  const [eventVenue, setEventVenue] = useState('');
 
   // Synchronize Active User Session & Bio on Mount
   useEffect(() => {
@@ -139,10 +151,26 @@ export default function MBMChatWorkspace() {
       })
       .subscribe();
 
+    const marketSub = supabase
+      .channel('public:market_items')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'market_items' }, () => {
+        fetchMarketItems();
+      })
+      .subscribe();
+
+    const eventSub = supabase
+      .channel('public:events')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+        fetchEvents();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(postSub);
       supabase.removeChannel(confessionSub);
       supabase.removeChannel(commentSub);
+      supabase.removeChannel(marketSub);
+      supabase.removeChannel(eventSub);
     };
   }, []);
 
@@ -150,12 +178,8 @@ export default function MBMChatWorkspace() {
     fetchPosts();
     fetchConfessions();
     fetchComments();
-
-    const { data: mktData } = await supabase.from('market_items').select('*').order('created_at', { ascending: false });
-    if (mktData) setMarketItems(mktData);
-
-    const { data: evData } = await supabase.from('events').select('*').order('created_at', { ascending: false });
-    if (evData) setEventsList(evData);
+    fetchMarketItems();
+    fetchEvents();
   };
 
   const fetchPosts = async () => {
@@ -171,6 +195,16 @@ export default function MBMChatWorkspace() {
   const fetchComments = async () => {
     const { data } = await supabase.from('comments').select('*').order('created_at', { ascending: true });
     if (data) setComments(data);
+  };
+
+  const fetchMarketItems = async () => {
+    const { data } = await supabase.from('market_items').select('*').order('created_at', { ascending: false });
+    if (data) setMarketItems(data);
+  };
+
+  const fetchEvents = async () => {
+    const { data } = await supabase.from('events').select('*').order('created_at', { ascending: false });
+    if (data) setEventsList(data);
   };
 
   // Save Bio & Profile Permanently in DB
@@ -206,7 +240,7 @@ export default function MBMChatWorkspace() {
   };
 
   // Report Content or User
-  const handleReport = async (contentType: 'post' | 'confession' | 'snap' | 'user', targetId: string) => {
+  const handleReport = async (contentType: 'post' | 'confession' | 'snap' | 'market' | 'event' | 'user', targetId: string) => {
     const reason = prompt(`Report this ${contentType}? Please provide reason (harassment, spam, abuse):`);
     if (!reason || !reason.trim()) return;
 
@@ -298,6 +332,61 @@ export default function MBMChatWorkspace() {
     });
   };
 
+  // Create Marketplace Listing
+  const handleCreateMarketItem = async () => {
+    if (!marketTitle.trim() || !marketPrice.trim()) {
+      alert('Item title and price are required.');
+      return;
+    }
+
+    const { error } = await supabase.from('market_items').insert([
+      {
+        title: marketTitle.trim(),
+        price: marketPrice.trim().startsWith('₹') ? marketPrice.trim() : `₹${marketPrice.trim()}`,
+        category: marketCategory,
+        seller: studentName || 'Student',
+        contact: marketContact.trim() || studentEmail
+      }
+    ]);
+
+    if (error) {
+      alert('Failed to list item: ' + error.message);
+    } else {
+      setMarketTitle('');
+      setMarketPrice('');
+      setMarketContact('');
+      setShowMarketModal(false);
+      fetchMarketItems();
+    }
+  };
+
+  // Create University Event
+  const handleCreateEvent = async () => {
+    if (!eventTitle.trim() || !eventVenue.trim() || !eventDate.trim()) {
+      alert('Event title, date, and venue are required.');
+      return;
+    }
+
+    const { error } = await supabase.from('events').insert([
+      {
+        title: eventTitle.trim(),
+        date: eventDate.trim(),
+        venue: eventVenue.trim(),
+        organizer: studentName || 'Student Council'
+      }
+    ]);
+
+    if (error) {
+      alert('Failed to create event: ' + error.message);
+    } else {
+      setEventTitle('');
+      setEventDate('');
+      setEventVenue('');
+      setShowEventModal(false);
+      fetchEvents();
+    }
+  };
+
   // Authentication - Login
   const handlePasswordLogin = async () => {
     if (!studentEmail.trim() || !studentPassword.trim()) {
@@ -319,17 +408,18 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Authentication - Registration Step 1: Send OTP
+  // Authentication - Registration Step 1: Send Real 6-Digit OTP
   const handleSendOtpRegister = async () => {
     if (!studentEmail.trim() || !studentPassword.trim() || !studentName.trim() || !rollNo.trim()) {
       alert('All registration fields are mandatory (Name, Roll No, Branch, Year, Email, Password).');
       return;
     }
     setAuthLoading(true);
-    const { error } = await supabase.auth.signUp({
+
+    const { error: otpErr } = await supabase.auth.signInWithOtp({
       email: studentEmail.trim(),
-      password: studentPassword.trim(),
       options: {
+        shouldCreateUser: true,
         data: {
           full_name: studentName.trim(),
           roll_no: rollNo.trim(),
@@ -340,47 +430,47 @@ export default function MBMChatWorkspace() {
         }
       }
     });
+
     setAuthLoading(false);
 
-    if (error) {
-      alert('Registration Error: ' + error.message);
+    if (otpErr) {
+      alert('OTP Sending Error: ' + otpErr.message);
     } else {
-      alert(`OTP email par send ho gaya hai (${studentEmail}). Email inbox ya spam folder check karein.`);
+      alert(`6-digit verification code email par bhej diya gaya hai (${studentEmail}). Inbox ya Spam check karein!`);
       setAuthStep('otp');
     }
   };
 
-  // Authentication - Registration Step 2: Verify OTP
+  // Authentication - Registration Step 2: Verify 6-Digit OTP & Link Password
   const handleVerifyOtp = async () => {
     if (!otpCode.trim()) {
       alert('Please enter the 6-digit OTP received in your email.');
       return;
     }
     setAuthLoading(true);
-    let { data, error } = await supabase.auth.verifyOtp({
+
+    const { error } = await supabase.auth.verifyOtp({
       email: studentEmail.trim(),
       token: otpCode.trim(),
-      type: 'signup'
+      type: 'email'
     });
 
     if (error) {
-      const retry = await supabase.auth.verifyOtp({
-        email: studentEmail.trim(),
-        token: otpCode.trim(),
-        type: 'email'
-      });
-      data = retry.data;
-      error = retry.error;
+      setAuthLoading(false);
+      alert('Invalid or Expired OTP: ' + error.message);
+      return;
     }
-    setAuthLoading(false);
 
-    if (error) {
-      alert('Invalid OTP: ' + error.message);
-    } else {
-      alert('Email Verified! Welcome to MBMChat.');
-      setSessionActive(true);
-      window.location.reload();
+    if (studentPassword.trim()) {
+      await supabase.auth.updateUser({
+        password: studentPassword.trim()
+      });
     }
+
+    setAuthLoading(false);
+    alert('Email Verified! Welcome to MBMChat.');
+    setSessionActive(true);
+    window.location.reload();
   };
 
   const handleLogout = async () => {
@@ -513,7 +603,7 @@ export default function MBMChatWorkspace() {
                         type="text" 
                         value={studentName}
                         onChange={e => setStudentName(e.target.value)}
-                        placeholder="Your full name" 
+                        placeholder="e.g. Vineet Kaler" 
                         className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
                       />
                     </div>
@@ -529,7 +619,6 @@ export default function MBMChatWorkspace() {
                       />
                     </div>
 
-                    {/* Department / Branch Dropdown */}
                     <div>
                       <label className="text-slate-400 text-[11px] mb-1 block">Department / Branch</label>
                       <select 
@@ -543,7 +632,6 @@ export default function MBMChatWorkspace() {
                       </select>
                     </div>
 
-                    {/* Academic Year Dropdown */}
                     <div>
                       <label className="text-slate-400 text-[11px] mb-1 block">Academic Year</label>
                       <select 
@@ -716,8 +804,8 @@ export default function MBMChatWorkspace() {
               { id: 'confessions', label: 'Confessions', icon: Lock },
               { id: 'chats', label: 'Classmate Chats', icon: MessageSquare },
               { id: 'wall', label: 'Campus Wall & Snaps', icon: Camera },
-              { id: 'market', label: 'Marketplace', icon: ShoppingBag },
-              { id: 'events', label: 'Events Hub', icon: Calendar },
+              { id: 'market', label: 'Marketplace', icon: ShoppingBag, badge: marketItems.length },
+              { id: 'events', label: 'Events Hub', icon: Calendar, badge: eventsList.length },
               { id: 'settings', label: 'Settings', icon: Settings },
             ].map(item => (
               <button
@@ -733,6 +821,11 @@ export default function MBMChatWorkspace() {
                   <item.icon className="w-4 h-4" />
                   <span>{item.label}</span>
                 </div>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded-md text-slate-300">
+                    {item.badge}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -763,6 +856,20 @@ export default function MBMChatWorkspace() {
                   {renderAuthorName(studentName, studentEmail)}
                 </div>
                 <p className="text-xs text-slate-400 font-mono mt-1">{branch} • {year} • Roll No: {rollNo}</p>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 text-center font-mono text-[10px]">
+                {[
+                  { label: "Opinion", icon: MessageCircle, color: "text-indigo-400", act: () => setActiveTab('feed') },
+                  { label: "Confess", icon: Lock, color: "text-purple-400", act: () => setActiveTab('confessions') },
+                  { label: "Market", icon: ShoppingBag, color: "text-emerald-400", act: () => setActiveTab('market') },
+                  { label: "Events", icon: Calendar, color: "text-cyan-400", act: () => setActiveTab('events') },
+                ].map((a, i) => (
+                  <button key={i} onClick={a.act} className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/15 transition flex flex-col items-center gap-1">
+                    <a.icon className={`w-5 h-5 ${a.color}`} />
+                    <span className="text-slate-300">{a.label}</span>
+                  </button>
+                ))}
               </div>
 
               <div className="p-5 rounded-3xl bg-[#070b14] border border-white/5 space-y-3 font-mono text-xs">
@@ -869,7 +976,7 @@ export default function MBMChatWorkspace() {
                                 className="text-slate-600 hover:text-amber-400 p-1"
                                 title="Report comment"
                               >
-                                <Flag className="w-3 h-3" />
+                                <Flag className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           ))}
@@ -1053,6 +1160,116 @@ export default function MBMChatWorkspace() {
             </div>
           )}
 
+          {/* TAB: MARKETPLACE */}
+          {activeTab === 'market' && (
+            <div className="space-y-4 font-sans">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold font-mono text-white">MBM Student Marketplace</h2>
+                  <p className="text-xs text-slate-400 font-mono">Buy, sell, or rent drafters, lab aprons, books, and calculators.</p>
+                </div>
+                <button 
+                  onClick={() => setShowMarketModal(true)} 
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>List Item</span>
+                </button>
+              </div>
+
+              {marketItems.length === 0 ? (
+                <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
+                  <ShoppingBag className="w-10 h-10 text-emerald-500/50 mx-auto mb-1" />
+                  <h4 className="text-sm font-bold text-slate-300">No items listed yet</h4>
+                  <p className="text-xs text-slate-500">List an engineering drafter, scientific calculator, or notes.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {marketItems.map(item => (
+                    <div key={item.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 flex flex-col justify-between gap-3">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-400 font-mono text-[9px] font-bold">
+                            {item.category || 'Supplies'}
+                          </span>
+                          <span className="text-emerald-400 font-mono font-black text-sm">
+                            {item.price}
+                          </span>
+                        </div>
+                        <h4 className="text-white font-bold text-sm mt-2">{item.title}</h4>
+                        <div className="text-[11px] text-slate-400 font-mono mt-1">
+                          Seller: {item.seller}
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono">
+                        <span className="text-cyan-400">📞 {item.contact || 'Chat in App'}</span>
+                        <button 
+                          onClick={() => handleReport('market', item.id)}
+                          className="text-slate-500 hover:text-amber-400 p-1"
+                          title="Report listing"
+                        >
+                          <Flag className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: EVENTS HUB */}
+          {activeTab === 'events' && (
+            <div className="space-y-4 font-sans">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold font-mono text-white">University Events Hub</h2>
+                  <p className="text-xs text-slate-400 font-mono">Workshops, sports meets, cultural fests & departmental guest lectures.</p>
+                </div>
+                <button 
+                  onClick={() => setShowEventModal(true)} 
+                  className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Post Event</span>
+                </button>
+              </div>
+
+              {eventsList.length === 0 ? (
+                <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
+                  <Calendar className="w-10 h-10 text-cyan-500/50 mx-auto mb-1" />
+                  <h4 className="text-sm font-bold text-slate-300">No scheduled events right now</h4>
+                  <p className="text-xs text-slate-500">Be the first to announce a club meetup or departmental workshop.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {eventsList.map(ev => (
+                    <div key={ev.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <h4 className="text-white font-bold text-sm">{ev.title}</h4>
+                        <div className="text-[11px] font-mono text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
+                          <span>📅 {ev.date}</span>
+                          <span>📍 {ev.venue}</span>
+                          {ev.organizer && <span>🏛️ By: {ev.organizer}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button 
+                          onClick={() => handleReport('event', ev.id)}
+                          className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg hover:bg-white/5 transition"
+                          title="Report event"
+                        >
+                          <Flag className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TAB: PROFILE */}
           {activeTab === 'profile' && (
             <div className="space-y-5 font-mono text-xs">
@@ -1098,6 +1315,31 @@ export default function MBMChatWorkspace() {
             </div>
           )}
 
+          {/* TAB: SETTINGS */}
+          {activeTab === 'settings' && (
+            <div className="space-y-4 font-mono text-xs">
+              <h2 className="text-base font-bold text-white">Account & Preferences</h2>
+              <div className="p-5 rounded-3xl bg-[#070b14] border border-white/10 space-y-4">
+                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                  <div>
+                    <div className="text-white font-bold">{studentName}</div>
+                    <div className="text-slate-400 text-[11px]">{studentEmail} • {rollNo}</div>
+                  </div>
+                  <button onClick={handleLogout} className="px-3 py-1.5 bg-rose-950 border border-rose-800 text-rose-300 rounded-xl">
+                    Sign Out
+                  </button>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <div>
+                    <div className="text-white font-bold">MBM University Network</div>
+                    <div className="text-slate-400 text-[11px]">{branch} • {year}</div>
+                  </div>
+                  <span className="text-emerald-400 font-bold text-[10px]">CONNECTED</span>
+                </div>
+              </div>
+            </div>
+          )}
+
         </main>
 
         {/* Right Sidebar Quick Actions */}
@@ -1108,6 +1350,10 @@ export default function MBMChatWorkspace() {
               <MessageCircle className="w-4 h-4" />
               <span>Post Opinion</span>
             </button>
+            <button onClick={() => setShowMarketModal(true)} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow">
+              <ShoppingBag className="w-4 h-4" />
+              <span>Sell Item</span>
+            </button>
             <button onClick={() => startCamera()} className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl flex items-center justify-center gap-2 shadow">
               <Camera className="w-4 h-4" />
               <span>Capture Snap</span>
@@ -1116,6 +1362,141 @@ export default function MBMChatWorkspace() {
         </aside>
 
       </div>
+
+      {/* Modal: List Marketplace Item */}
+      {showMarketModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
+          <div className="max-w-md w-full rounded-3xl bg-[#070b14] border border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold font-mono text-white flex items-center gap-2">
+                <ShoppingBag className="w-4 h-4 text-emerald-400" />
+                <span>List an Item for Sale / Exchange</span>
+              </h3>
+              <button onClick={() => setShowMarketModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 font-mono text-xs">
+              <div>
+                <label className="text-slate-400 text-[11px] mb-1 block">Item Title</label>
+                <input
+                  type="text"
+                  value={marketTitle}
+                  onChange={e => setMarketTitle(e.target.value)}
+                  placeholder="e.g. Mini Drafter, Casio FX-991EX, Surveying Notes"
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-slate-400 text-[11px] mb-1 block">Price</label>
+                  <input
+                    type="text"
+                    value={marketPrice}
+                    onChange={e => setMarketPrice(e.target.value)}
+                    placeholder="₹250 or Free"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 text-[11px] mb-1 block">Category</label>
+                  <select
+                    value={marketCategory}
+                    onChange={e => setMarketCategory(e.target.value)}
+                    className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2 py-2 text-white text-xs outline-none focus:border-emerald-500"
+                  >
+                    <option value="Drafters & Tools">Drafters & Tools</option>
+                    <option value="Calculators">Calculators</option>
+                    <option value="Books & Notes">Books & Notes</option>
+                    <option value="Lab Coats / Aprons">Lab Aprons</option>
+                    <option value="Hostel Essentials">Hostel Essentials</option>
+                    <option value="Electronics">Electronics</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 text-[11px] mb-1 block">Contact Number / WhatsApp / Room No</label>
+                <input
+                  type="text"
+                  value={marketContact}
+                  onChange={e => setMarketContact(e.target.value)}
+                  placeholder="e.g. WhatsApp: 9876543210 or Room 42"
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <button
+                onClick={handleCreateMarketItem}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl mt-2 transition"
+              >
+                Post Listing to Marketplace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Post Event */}
+      {showEventModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
+          <div className="max-w-md w-full rounded-3xl bg-[#070b14] border border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold font-mono text-white flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-cyan-400" />
+                <span>Post University Event</span>
+              </h3>
+              <button onClick={() => setShowEventModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 font-mono text-xs">
+              <div>
+                <label className="text-slate-400 text-[11px] mb-1 block">Event Title</label>
+                <input
+                  type="text"
+                  value={eventTitle}
+                  onChange={e => setEventTitle(e.target.value)}
+                  placeholder="e.g. Robotics Club Hackathon, Mining Guest Lecture"
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 text-[11px] mb-1 block">Date & Timing</label>
+                <input
+                  type="text"
+                  value={eventDate}
+                  onChange={e => setEventDate(e.target.value)}
+                  placeholder="e.g. 24 Sept, 4:00 PM onwards"
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 text-[11px] mb-1 block">Venue / Location</label>
+                <input
+                  type="text"
+                  value={eventVenue}
+                  onChange={e => setEventVenue(e.target.value)}
+                  placeholder="e.g. Auditorium, Mining Dept Seminar Hall, Ground"
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <button
+                onClick={handleCreateEvent}
+                className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl mt-2 transition"
+              >
+                Announce Event
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Camera Live Modal */}
       {isCameraOpen && (
