@@ -14,13 +14,13 @@ export default function MBMChatWorkspace() {
     'market' | 'events' | 'settings' | 'profile'
   >('home');
 
-  // Authentication Management
+  // Authentication State
   const [sessionActive, setSessionActive] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authStep, setAuthStep] = useState<'details' | 'otp'>('details');
   const [authLoading, setAuthLoading] = useState(false);
   
-  // Credentials & Academic Attributes
+  // Registration & Login Fields
   const [studentEmail, setStudentEmail] = useState('');
   const [studentPassword, setStudentPassword] = useState('');
   const [studentName, setStudentName] = useState('');
@@ -42,7 +42,7 @@ export default function MBMChatWorkspace() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Live Synchronized Channels
+  // Live Database Stores
   const [chatPeers, setChatPeers] = useState<any[]>([]);
   const [selectedPeer, setSelectedPeer] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -64,7 +64,7 @@ export default function MBMChatWorkspace() {
   const [eventVenue, setEventVenue] = useState('');
   const [showEventModal, setShowEventModal] = useState(false);
 
-  // Synchronize Active User Session
+  // Synchronize Active User Session on Mount
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -80,7 +80,7 @@ export default function MBMChatWorkspace() {
     });
   }, []);
 
-  // Database Subscriptions
+  // Supabase Realtime Channels
   useEffect(() => {
     fetchInitialData();
 
@@ -137,7 +137,7 @@ export default function MBMChatWorkspace() {
   // Student Direct Login (Email + Password)
   const handlePasswordLogin = async () => {
     if (!studentEmail.trim() || !studentPassword.trim()) {
-      alert('Please provide your registered email address and password.');
+      alert('Please enter your email address and password.');
       return;
     }
     setAuthLoading(true);
@@ -159,10 +159,10 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Registration Dispatch: Trigger Verification Token
+  // Registration Dispatch: Trigger 6-Digit OTP Directly
   const handleRegisterOtpRequest = async () => {
     if (!studentEmail.trim() || !studentPassword.trim() || !studentName.trim() || !rollNo.trim()) {
-      alert('All registration fields are required.');
+      alert('All registration fields are mandatory.');
       return;
     }
     if (studentPassword.length < 6) {
@@ -171,10 +171,11 @@ export default function MBMChatWorkspace() {
     }
 
     setAuthLoading(true);
-    const { error } = await supabase.auth.signUp({
+
+    const { error } = await supabase.auth.signInWithOtp({
       email: studentEmail.trim(),
-      password: studentPassword.trim(),
       options: {
+        shouldCreateUser: true,
         data: {
           full_name: studentName.trim(),
           roll_no: rollNo.trim(),
@@ -185,17 +186,18 @@ export default function MBMChatWorkspace() {
         }
       }
     });
+
     setAuthLoading(false);
 
     if (error) {
       alert(error.message);
     } else {
       setAuthStep('otp');
-      alert(`Verification code dispatched to ${studentEmail}. Please inspect your inbox.`);
+      alert(`A 6-digit confirmation code has been dispatched to ${studentEmail}.`);
     }
   };
 
-  // Verification Token Validation
+  // Verification Token Validation & Password Assignment
   const handleVerifyOtp = async () => {
     if (otpCode.length !== 6) {
       alert('Please enter a valid 6-digit confirmation code.');
@@ -203,27 +205,25 @@ export default function MBMChatWorkspace() {
     }
     setAuthLoading(true);
 
-    let { data, error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email: studentEmail.trim(),
       token: otpCode.trim(),
-      type: 'signup'
+      type: 'email'
     });
 
     if (error) {
-      const retry = await supabase.auth.verifyOtp({
-        email: studentEmail.trim(),
-        token: otpCode.trim(),
-        type: 'email'
-      });
-      data = retry.data;
-      error = retry.error;
+      setAuthLoading(false);
+      alert(error.message);
+      return;
     }
 
-    setAuthLoading(false);
+    if (data.session) {
+      if (studentPassword.trim()) {
+        await supabase.auth.updateUser({
+          password: studentPassword.trim()
+        });
+      }
 
-    if (error) {
-      alert(error.message);
-    } else if (data.session) {
       setSessionActive(true);
       const meta = data.user?.user_metadata;
       if (meta?.full_name) setStudentName(meta.full_name);
@@ -231,6 +231,8 @@ export default function MBMChatWorkspace() {
       if (meta?.branch) setBranch(meta.branch);
       if (meta?.year) setYear(meta.year);
     }
+
+    setAuthLoading(false);
   };
 
   const handleLogout = async () => {
@@ -254,7 +256,7 @@ export default function MBMChatWorkspace() {
       setCameraFacingMode(mode);
       setActiveTab('snaps');
     } catch {
-      alert('Camera access was denied or is not supported on this device.');
+      alert('Camera access denied or device unsupported.');
       setActiveTab('snaps');
     }
   };
@@ -292,7 +294,7 @@ export default function MBMChatWorkspace() {
       branch,
       year,
       imageUrl: capturedSnapUrl,
-      caption: snapCaption || 'Campus moment',
+      caption: snapCaption || 'Campus capture',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       likes: 0
     };
@@ -384,7 +386,7 @@ export default function MBMChatWorkspace() {
   };
 
   // -------------------------------------------------------------
-  // REGISTRATION & LOGIN PORTAL
+  // AUTHENTICATION SCREEN
   // -------------------------------------------------------------
   if (!sessionActive) {
     return (
@@ -401,7 +403,7 @@ export default function MBMChatWorkspace() {
                 MBM University<br /><span className="text-indigo-400">Student Portal</span>
               </h2>
               <p className="text-xs font-mono text-slate-400 leading-relaxed">
-                Official network for registered students to communicate, collaborate, and trade campus inventory.
+                Connect with classmates, share public moments, trade course supplies, and participate in discussions.
               </p>
             </div>
             
@@ -446,10 +448,10 @@ export default function MBMChatWorkspace() {
                 </h3>
                 <p className="text-xs text-slate-400 font-mono mt-1">
                   {authStep === 'otp' 
-                    ? `Enter the 6-digit confirmation code dispatched to ${studentEmail}` 
+                    ? `Enter the 6-digit confirmation code sent to ${studentEmail}` 
                     : authMode === 'login' 
                       ? 'Enter your institutional email address and account password.' 
-                      : 'Provide your academic details to receive a verification token.'}
+                      : 'Provide your academic details to receive a 6-digit verification code.'}
                 </p>
               </div>
 
@@ -668,7 +670,7 @@ export default function MBMChatWorkspace() {
           </div>
         </aside>
 
-        {/* Central Stage */}
+        {/* Central Viewport */}
         <main className="col-span-1 md:col-span-6 p-4 sm:p-6 overflow-y-auto">
           
           {/* TAB: DASHBOARD */}
@@ -707,7 +709,7 @@ export default function MBMChatWorkspace() {
             </div>
           )}
 
-          {/* TAB: DISCOVER / PUBLIC SNAPS */}
+          {/* TAB: DISCOVER / CAMPUS WALL */}
           {activeTab === 'discover' && (
             <div className="space-y-4 font-sans">
               <div className="flex items-center justify-between">
@@ -1058,7 +1060,7 @@ export default function MBMChatWorkspace() {
 
       </div>
 
-      {/* Mobile Bar */}
+      {/* Mobile Bottom Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-[#03060c]/95 border-t border-white/5 backdrop-blur flex items-center justify-around z-40 font-mono text-[10px]">
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-indigo-400 font-bold' : 'text-slate-500'}`}>
           <Home className="w-4 h-4" />
