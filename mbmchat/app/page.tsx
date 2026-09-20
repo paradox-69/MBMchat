@@ -159,7 +159,7 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Registration Dispatch: Trigger 6-Digit OTP Directly
+ // Instant Campus Registration (No Verification Link / Direct Login)
   const handleRegisterOtpRequest = async () => {
     if (!studentEmail.trim() || !studentPassword.trim() || !studentName.trim() || !rollNo.trim()) {
       alert('All registration fields are mandatory.');
@@ -172,10 +172,10 @@ export default function MBMChatWorkspace() {
 
     setAuthLoading(true);
 
-    const { error } = await supabase.auth.signInWithOtp({
+    const { data, error } = await supabase.auth.signUp({
       email: studentEmail.trim(),
+      password: studentPassword.trim(),
       options: {
-        shouldCreateUser: true,
         data: {
           full_name: studentName.trim(),
           roll_no: rollNo.trim(),
@@ -192,8 +192,10 @@ export default function MBMChatWorkspace() {
     if (error) {
       alert(error.message);
     } else {
-      setAuthStep('otp');
-      alert(`A 6-digit confirmation code has been dispatched to ${studentEmail}.`);
+      setSessionActive(true);
+      setStudentName(studentName.trim());
+      setRollNo(rollNo.trim());
+      alert('Registration successful! Welcome to MBM Campus Portal.');
     }
   };
 
