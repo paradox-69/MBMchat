@@ -39,6 +39,7 @@ export default function MBMChatWorkspace() {
   // Authentication State
   const [sessionActive, setSessionActive] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authStep, setAuthStep] = useState<'details' | 'otp'>('details');
   const [authLoading, setAuthLoading] = useState(false);
   
   // Registration & Login Fields
@@ -48,6 +49,7 @@ export default function MBMChatWorkspace() {
   const [rollNo, setRollNo] = useState('');
   const [branch, setBranch] = useState(MBM_BRANCHES[0]);
   const [year, setYear] = useState('1st Year');
+  const [otpCode, setOtpCode] = useState('');
 
   // Profile Customization & Persistence
   const [studentBio, setStudentBio] = useState('Mining Engineering student at MBM University.');
@@ -463,41 +465,81 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Direct Instant Registration (Fault-Tolerant, No Trigger Crash)
-  const handleDirectRegister = async () => {
+  // 1. Send 6-Digit OTP via Custom SMTP (Gmail/Resend)
+  const handleSendRegistrationOtp = async () => {
     if (!studentEmail.trim() || !studentPassword.trim() || !studentName.trim() || !rollNo.trim()) {
       alert('All registration fields are mandatory (Name, Roll No, Branch, Year, Email, Password).');
       return;
     }
     setAuthLoading(true);
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { error: otpErr } = await supabase.auth.signInWithOtp({
       email: studentEmail.trim(),
-      password: studentPassword.trim()
+      options: {
+        shouldCreateUser: true,
+        data: {
+          full_name: studentName.trim(),
+          roll_no: rollNo.trim(),
+          branch,
+          year,
+          bio: studentBio,
+          interests: studentInterests
+        }
+      }
     });
 
-    if (authError) {
+    setAuthLoading(false);
+
+    if (otpErr) {
+      alert('OTP Sending Error: ' + otpErr.message);
+    } else {
+      alert(`6-digit verification code email par bhej diya gaya hai (${studentEmail}). Inbox ya Spam check karein!`);
+      setAuthStep('otp');
+    }
+  };
+
+  // 2. Verify 6-Digit OTP & Save Profile
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim()) {
+      alert('Please enter the 6-digit OTP received in your email.');
+      return;
+    }
+    setAuthLoading(true);
+
+    const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
+      email: studentEmail.trim(),
+      token: otpCode.trim(),
+      type: 'email'
+    });
+
+    if (verifyErr) {
       setAuthLoading(false);
-      alert('Registration Error: ' + authError.message);
+      alert('Invalid or Expired OTP: ' + verifyErr.message);
       return;
     }
 
-    if (authData?.user) {
+    if (studentPassword.trim()) {
+      await supabase.auth.updateUser({
+        password: studentPassword.trim()
+      });
+    }
+
+    if (verifyData?.user) {
       await supabase.from('profiles').upsert({
-        id: authData.user.id,
+        id: verifyData.user.id,
         email: studentEmail.trim(),
         full_name: studentName.trim(),
         name: studentName.trim(),
         roll_no: rollNo.trim(),
-        branch: branch,
-        year: year,
+        branch,
+        year,
         bio: studentBio,
         interests: studentInterests
       });
     }
 
     setAuthLoading(false);
-    alert('Registration Successful! Welcome to MBM Campus Portal.');
+    alert('Email Verified Successfully! Welcome to MBMChat.');
     setSessionActive(true);
     window.location.reload();
   };
@@ -607,14 +649,14 @@ export default function MBMChatWorkspace() {
             <div className="max-w-md mx-auto w-full space-y-5">
               <div className="grid grid-cols-2 p-1 bg-white/5 border border-white/10 rounded-2xl font-mono text-xs">
                 <button 
-                  onClick={() => setAuthMode('login')}
+                  onClick={() => { setAuthMode('login'); setAuthStep('details'); }}
                   className={`py-2 rounded-xl font-bold transition flex items-center justify-center gap-2 ${authMode === 'login' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span>Sign In</span>
                 </button>
                 <button 
-                  onClick={() => setAuthMode('register')}
+                  onClick={() => { setAuthMode('register'); setAuthStep('details'); }}
                   className={`py-2 rounded-xl font-bold transition flex items-center justify-center gap-2 ${authMode === 'register' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                 >
                   <UserPlus className="w-3.5 h-3.5" />
@@ -623,8 +665,8 @@ export default function MBMChatWorkspace() {
               </div>
 
               <div className="space-y-3 font-mono text-xs">
-                {/* Direct Instant Registration Form */}
-                {authMode === 'register' && (
+                {/* Registration Details Form (Step 1) */}
+                {authMode === 'register' && authStep === 'details' && (
                   <>
                     <div>
                       <label className="text-slate-400 text-[11px] mb-1 block">Full Name</label>
@@ -698,14 +740,51 @@ export default function MBMChatWorkspace() {
                     </div>
 
                     <button 
-                      onClick={handleDirectRegister}
+                      onClick={handleSendRegistrationOtp}
                       disabled={authLoading}
                       className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
                     >
-                      <span>{authLoading ? 'Creating Account...' : 'Register Instant →'}</span>
+                      <span>{authLoading ? 'Sending OTP...' : 'Send 6-Digit OTP →'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </>
+                )}
+
+                {/* OTP Verification Screen (Step 2) */}
+                {authMode === 'register' && authStep === 'otp' && (
+                  <div className="space-y-4">
+                    <div className="p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-center">
+                      <p className="text-xs text-indigo-300">OTP code sent to:</p>
+                      <p className="font-bold text-white text-xs mt-0.5">{studentEmail}</p>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-400 text-[11px] mb-1 block">Enter 6-Digit Email OTP</label>
+                      <input 
+                        type="text" 
+                        maxLength={8}
+                        value={otpCode}
+                        onChange={e => setOtpCode(e.target.value)}
+                        placeholder="Enter 6-digit OTP" 
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-center tracking-widest text-lg font-bold text-cyan-400 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <button 
+                      onClick={handleVerifyOtp}
+                      disabled={authLoading}
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
+                    >
+                      <span>{authLoading ? 'Verifying OTP...' : 'Verify OTP & Enter Campus Portal'}</span>
+                    </button>
+
+                    <button 
+                      onClick={() => setAuthStep('details')}
+                      className="w-full text-center text-[11px] text-slate-400 hover:text-white pt-1"
+                    >
+                      ← Back to Details / Change Email
+                    </button>
+                  </div>
                 )}
 
                 {/* Login Form */}
@@ -1101,7 +1180,7 @@ export default function MBMChatWorkspace() {
             </div>
           )}
 
-          {/* TAB: CHATS (ADD / REMOVE CLASSMATES) */}
+          {/* TAB: CHATS */}
           {activeTab === 'chats' && (
             <div className="space-y-4 font-sans">
               <div className="flex items-center justify-between">
