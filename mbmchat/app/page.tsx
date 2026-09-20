@@ -36,7 +36,7 @@ export default function MBMChatWorkspace() {
     'market' | 'events' | 'settings' | 'profile'
   >('home');
 
-  // Authentication State
+  // Authentication State (OTP Flow untouched & secure)
   const [sessionActive, setSessionActive] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authStep, setAuthStep] = useState<'details' | 'otp'>('details');
@@ -54,7 +54,6 @@ export default function MBMChatWorkspace() {
   // Profile Customization & Persistence
   const [studentBio, setStudentBio] = useState('Mining Engineering student at MBM University.');
   const [studentInterests, setStudentInterests] = useState<string[]>(['Mining', 'Fieldwork', 'Reading']);
-  const [interestInput, setInterestInput] = useState('');
   const [savingBio, setSavingBio] = useState(false);
 
   // Camera & Visual Snaps
@@ -66,7 +65,7 @@ export default function MBMChatWorkspace() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Live Database Stores & Classmate Contacts (Add/Remove peer)
+  // Live Database Stores & Add Friends / P2P Chat State
   const [chatPeers, setChatPeers] = useState<any[]>([]);
   const [selectedPeer, setSelectedPeer] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -250,38 +249,38 @@ export default function MBMChatWorkspace() {
     return <span className="font-bold text-white">{authorName || 'Student'}</span>;
   };
 
-  // Classmate Contacts Management: Add & Remove Peers
-  const handleAddClassmate = () => {
-    const name = prompt('Enter classmate name to start chat:');
-    if (!name || !name.trim()) return;
+  // Add Friends & P2P Chat Management
+  const handleAddFriend = () => {
+    const friendName = prompt('Enter friend or classmate name to add for P2P chat:');
+    if (!friendName || !friendName.trim()) return;
 
-    const trimmed = name.trim();
+    const trimmed = friendName.trim();
     if (chatPeers.some(p => p.name.toLowerCase() === trimmed.toLowerCase())) {
-      alert('Classmate already in your conversation list.');
+      alert('This friend is already in your chat list.');
       return;
     }
 
-    const newPeer = {
-      id: `p_${Date.now()}`,
+    const newFriend = {
+      id: `friend_${Date.now()}`,
       name: trimmed,
       initials: trimmed.slice(0, 2).toUpperCase()
     };
 
-    setChatPeers(prev => [newPeer, ...prev]);
-    setSelectedPeer(newPeer);
+    setChatPeers(prev => [newFriend, ...prev]);
+    setSelectedPeer(newFriend);
     setActiveTab('chats');
   };
 
-  const handleRemoveClassmate = (peerId: string, peerName: string) => {
-    if (!confirm(`Remove ${peerName} from your classmate list?`)) return;
-    setChatPeers(prev => prev.filter(p => p.id !== peerId));
-    if (selectedPeer?.id === peerId) {
+  const handleRemoveFriend = (friendId: string, friendName: string) => {
+    if (!confirm(`Remove ${friendName} from your friends list?`)) return;
+    setChatPeers(prev => prev.filter(p => p.id !== friendId));
+    if (selectedPeer?.id === friendId) {
       setSelectedPeer(null);
     }
   };
 
-  // Send Direct Message
-  const sendMessage = async () => {
+  // Send Direct P2P Message
+  const sendP2PMessage = async () => {
     if (!chatDraft.trim() || !selectedPeer) return;
     const textToSend = chatDraft.trim();
     setChatDraft('');
@@ -465,7 +464,7 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // 1. Send 6-Digit OTP via Custom SMTP
+  // Secure OTP Step 1: Send 6-Digit OTP
   const handleSendRegistrationOtp = async () => {
     if (!studentEmail.trim() || !studentPassword.trim() || !studentName.trim() || !rollNo.trim()) {
       alert('All registration fields are mandatory (Name, Roll No, Branch, Year, Email, Password).');
@@ -498,7 +497,7 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // 2. Verify 6-Digit OTP & Save Profile
+  // Secure OTP Step 2: Verify 6-Digit OTP & Save Profile
   const handleVerifyOtp = async () => {
     if (!otpCode.trim()) {
       alert('Please enter the 6-digit OTP received in your email.');
@@ -625,918 +624,933 @@ export default function MBMChatWorkspace() {
     ]);
   };
 
-  // Auth Screen
+  // Auth Screen (Secured with OTP)
   if (!sessionActive) {
     return (
-      <div className="min-h-screen bg-[#03060c] text-slate-100 flex items-center justify-center p-4 sm:p-8 font-sans">
-        <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-12 rounded-3xl overflow-hidden border border-white/10 bg-[#070b14] shadow-2xl">
-          <div className="md:col-span-5 p-8 flex flex-col justify-between bg-gradient-to-b from-[#0c1424] to-[#050811] border-r border-white/5">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center font-mono font-bold text-white shadow-lg">M</span>
-                <h1 className="text-xl font-black font-mono tracking-tight text-white">MBM<span className="text-cyan-400">Chat</span></h1>
+      <div className="min-h-screen bg-[#03060c] text-slate-100 flex flex-col items-center justify-between p-4 sm:p-8 font-sans">
+        <div className="w-full flex-1 flex items-center justify-center">
+          <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-12 rounded-3xl overflow-hidden border border-white/10 bg-[#070b14] shadow-2xl">
+            <div className="md:col-span-5 p-8 flex flex-col justify-between bg-gradient-to-b from-[#0c1424] to-[#050811] border-r border-white/5">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center font-mono font-bold text-white shadow-lg">M</span>
+                  <h1 className="text-xl font-black font-mono tracking-tight text-white">MBM<span className="text-cyan-400">Chat</span></h1>
+                </div>
+                <h2 className="text-2xl font-black font-mono tracking-tight text-white leading-tight">
+                  MBM University<br /><span className="text-indigo-400">Student Network</span>
+                </h2>
+                <p className="text-xs font-mono text-slate-400 leading-relaxed">
+                  Campus opinions, anonymous confessions, direct classmate chats, and student moderation.
+                </p>
               </div>
-              <h2 className="text-2xl font-black font-mono tracking-tight text-white leading-tight">
-                MBM University<br /><span className="text-indigo-400">Student Network</span>
-              </h2>
-              <p className="text-xs font-mono text-slate-400 leading-relaxed">
-                Campus opinions, anonymous confessions, direct classmate chats, and student moderation.
-              </p>
             </div>
-          </div>
 
-          <div className="md:col-span-7 p-8 flex flex-col justify-center bg-[#050811]">
-            <div className="max-w-md mx-auto w-full space-y-5">
-              <div className="grid grid-cols-2 p-1 bg-white/5 border border-white/10 rounded-2xl font-mono text-xs">
-                <button 
-                  onClick={() => { setAuthMode('login'); setAuthStep('details'); }}
-                  className={`py-2 rounded-xl font-bold transition flex items-center justify-center gap-2 ${authMode === 'login' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-                >
-                  <LogIn className="w-3.5 h-3.5" />
-                  <span>Sign In</span>
-                </button>
-                <button 
-                  onClick={() => { setAuthMode('register'); setAuthStep('details'); }}
-                  className={`py-2 rounded-xl font-bold transition flex items-center justify-center gap-2 ${authMode === 'register' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Registration</span>
-                </button>
-              </div>
+            <div className="md:col-span-7 p-8 flex flex-col justify-center bg-[#050811]">
+              <div className="max-w-md mx-auto w-full space-y-5">
+                <div className="grid grid-cols-2 p-1 bg-white/5 border border-white/10 rounded-2xl font-mono text-xs">
+                  <button 
+                    onClick={() => { setAuthMode('login'); setAuthStep('details'); }}
+                    className={`py-2 rounded-xl font-bold transition flex items-center justify-center gap-2 ${authMode === 'login' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Sign In</span>
+                  </button>
+                  <button 
+                    onClick={() => { setAuthMode('register'); setAuthStep('details'); }}
+                    className={`py-2 rounded-xl font-bold transition flex items-center justify-center gap-2 ${authMode === 'register' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Registration</span>
+                  </button>
+                </div>
 
-              <div className="space-y-3 font-mono text-xs">
-                {/* Registration Details Form (Step 1) */}
-                {authMode === 'register' && authStep === 'details' && (
-                  <>
-                    <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Full Name</label>
-                      <input 
-                        type="text" 
-                        value={studentName}
-                        onChange={e => setStudentName(e.target.value)}
-                        placeholder="e.g. Vineet Kaler" 
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                      />
-                    </div>
+                <div className="space-y-3 font-mono text-xs">
+                  {/* Registration Details Form (Step 1) */}
+                  {authMode === 'register' && authStep === 'details' && (
+                    <>
+                      <div>
+                        <label className="text-slate-400 text-[11px] mb-1 block">Full Name</label>
+                        <input 
+                          type="text" 
+                          value={studentName}
+                          onChange={e => setStudentName(e.target.value)}
+                          placeholder="e.g. Vineet Kaler" 
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
+                        />
+                      </div>
 
-                    <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Roll Number</label>
-                      <input 
-                        type="text" 
-                        value={rollNo}
-                        onChange={e => setRollNo(e.target.value)}
-                        placeholder="e.g. 23UFIEXXXX" 
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                      />
-                    </div>
+                      <div>
+                        <label className="text-slate-400 text-[11px] mb-1 block">Roll Number</label>
+                        <input 
+                          type="text" 
+                          value={rollNo}
+                          onChange={e => setRollNo(e.target.value)}
+                          placeholder="e.g. 23UFIEXXXX" 
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
+                        />
+                      </div>
 
-                    <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Department / Branch</label>
-                      <select 
-                        value={branch}
-                        onChange={e => setBranch(e.target.value)}
-                        className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2.5 py-2.5 text-white text-xs outline-none focus:border-indigo-500"
+                      <div>
+                        <label className="text-slate-400 text-[11px] mb-1 block">Department / Branch</label>
+                        <select 
+                          value={branch}
+                          onChange={e => setBranch(e.target.value)}
+                          className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2.5 py-2.5 text-white text-xs outline-none focus:border-indigo-500"
+                        >
+                          {MBM_BRANCHES.map(b => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 text-[11px] mb-1 block">Academic Year</label>
+                        <select 
+                          value={year}
+                          onChange={e => setYear(e.target.value)}
+                          className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2.5 py-2.5 text-white text-xs outline-none focus:border-indigo-500"
+                        >
+                          <option value="1st Year">1st Year</option>
+                          <option value="2nd Year">2nd Year</option>
+                          <option value="3rd Year">3rd Year</option>
+                          <option value="4th Year">4th Year</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
+                        <input 
+                          type="email" 
+                          value={studentEmail}
+                          onChange={e => setStudentEmail(e.target.value)}
+                          placeholder="student@example.com" 
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
+                        <input 
+                          type="password" 
+                          value={studentPassword}
+                          onChange={e => setStudentPassword(e.target.value)}
+                          placeholder="••••••••" 
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <button 
+                        onClick={handleSendRegistrationOtp}
+                        disabled={authLoading}
+                        className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
                       >
-                        {MBM_BRANCHES.map(b => (
-                          <option key={b} value={b}>{b}</option>
-                        ))}
-                      </select>
-                    </div>
+                        <span>{authLoading ? 'Sending OTP...' : 'Send 6-Digit OTP →'}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
 
-                    <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Academic Year</label>
-                      <select 
-                        value={year}
-                        onChange={e => setYear(e.target.value)}
-                        className="w-full bg-[#0c1424] border border-white/10 rounded-xl px-2.5 py-2.5 text-white text-xs outline-none focus:border-indigo-500"
+                  {/* OTP Verification Screen (Step 2) */}
+                  {authMode === 'register' && authStep === 'otp' && (
+                    <div className="space-y-4">
+                      <div className="p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-center">
+                        <p className="text-xs text-indigo-300">OTP code sent to:</p>
+                        <p className="font-bold text-white text-xs mt-0.5">{studentEmail}</p>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 text-[11px] mb-1 block">Enter 6-Digit Email OTP</label>
+                        <input 
+                          type="text" 
+                          maxLength={8}
+                          value={otpCode}
+                          onChange={e => setOtpCode(e.target.value)}
+                          placeholder="Enter 6-digit OTP" 
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-center tracking-widest text-lg font-bold text-cyan-400 outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <button 
+                        onClick={handleVerifyOtp}
+                        disabled={authLoading}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
                       >
-                        <option value="1st Year">1st Year</option>
-                        <option value="2nd Year">2nd Year</option>
-                        <option value="3rd Year">3rd Year</option>
-                        <option value="4th Year">4th Year</option>
-                      </select>
+                        <span>{authLoading ? 'Verifying OTP...' : 'Verify OTP & Enter Campus Portal'}</span>
+                      </button>
+
+                      <button 
+                        onClick={() => setAuthStep('details')}
+                        className="w-full text-center text-[11px] text-slate-400 hover:text-white pt-1"
+                      >
+                        ← Back to Details / Change Email
+                      </button>
                     </div>
+                  )}
 
-                    <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
-                      <input 
-                        type="email" 
-                        value={studentEmail}
-                        onChange={e => setStudentEmail(e.target.value)}
-                        placeholder="student@example.com" 
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                      />
-                    </div>
+                  {/* Login Form */}
+                  {authMode === 'login' && (
+                    <>
+                      <div>
+                        <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
+                        <input 
+                          type="email" 
+                          value={studentEmail}
+                          onChange={e => setStudentEmail(e.target.value)}
+                          placeholder="student@example.com" 
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
+                        />
+                      </div>
 
-                    <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
-                      <input 
-                        type="password" 
-                        value={studentPassword}
-                        onChange={e => setStudentPassword(e.target.value)}
-                        placeholder="••••••••" 
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                      />
-                    </div>
+                      <div>
+                        <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
+                        <input 
+                          type="password" 
+                          value={studentPassword}
+                          onChange={e => setStudentPassword(e.target.value)}
+                          placeholder="••••••••" 
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
+                        />
+                      </div>
 
-                    <button 
-                      onClick={handleSendRegistrationOtp}
-                      disabled={authLoading}
-                      className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
-                    >
-                      <span>{authLoading ? 'Sending OTP...' : 'Send 6-Digit OTP →'}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-
-                {/* OTP Verification Screen (Step 2) */}
-                {authMode === 'register' && authStep === 'otp' && (
-                  <div className="space-y-4">
-                    <div className="p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-center">
-                      <p className="text-xs text-indigo-300">OTP code sent to:</p>
-                      <p className="font-bold text-white text-xs mt-0.5">{studentEmail}</p>
-                    </div>
-
-                    <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Enter 6-Digit Email OTP</label>
-                      <input 
-                        type="text" 
-                        maxLength={8}
-                        value={otpCode}
-                        onChange={e => setOtpCode(e.target.value)}
-                        placeholder="Enter 6-digit OTP" 
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-center tracking-widest text-lg font-bold text-cyan-400 outline-none focus:border-indigo-500"
-                      />
-                    </div>
-
-                    <button 
-                      onClick={handleVerifyOtp}
-                      disabled={authLoading}
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
-                    >
-                      <span>{authLoading ? 'Verifying OTP...' : 'Verify OTP & Enter Campus Portal'}</span>
-                    </button>
-
-                    <button 
-                      onClick={() => setAuthStep('details')}
-                      className="w-full text-center text-[11px] text-slate-400 hover:text-white pt-1"
-                    >
-                      ← Back to Details / Change Email
-                    </button>
-                  </div>
-                )}
-
-                {/* Login Form */}
-                {authMode === 'login' && (
-                  <>
-                    <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
-                      <input 
-                        type="email" 
-                        value={studentEmail}
-                        onChange={e => setStudentEmail(e.target.value)}
-                        placeholder="student@example.com" 
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
-                      <input 
-                        type="password" 
-                        value={studentPassword}
-                        onChange={e => setStudentPassword(e.target.value)}
-                        placeholder="••••••••" 
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-indigo-500"
-                      />
-                    </div>
-
-                    <button 
-                      onClick={handlePasswordLogin}
-                      disabled={authLoading}
-                      className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
-                    >
-                      <span>{authLoading ? 'Verifying...' : 'Sign In'}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
+                      <button 
+                        onClick={handlePasswordLogin}
+                        disabled={authLoading}
+                        className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
+                      >
+                        <span>{authLoading ? 'Verifying...' : 'Sign In'}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Footer on Auth Page */}
+        <footer className="w-full py-4 text-center font-mono text-[11px] text-slate-500 border-t border-white/5 space-y-1 mt-6">
+          <p>© 2026 MBM University. All rights reserved. T&C Applied.</p>
+          <p className="text-indigo-400">Developed by Vineet Kaler</p>
+        </footer>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#03060c] text-slate-100 flex flex-col font-sans selection:bg-indigo-600">
-      
-      {/* Top Application Bar */}
-      <header className="h-14 border-b border-white/5 bg-[#050811]/90 backdrop-blur sticky top-0 z-40 px-4 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <span className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center font-mono font-bold text-white shadow-md text-sm">M</span>
-          <span className="font-mono font-black text-white text-base tracking-tight">MBM<span className="text-cyan-400">Chat</span></span>
-        </div>
+    <div className="min-h-screen bg-[#03060c] text-slate-100 flex flex-col justify-between font-sans selection:bg-indigo-600">
+      <div>
+        {/* Top Application Bar */}
+        <header className="h-14 border-b border-white/5 bg-[#050811]/90 backdrop-blur sticky top-0 z-40 px-4 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center font-mono font-bold text-white shadow-md text-sm">M</span>
+            <span className="font-mono font-black text-white text-base tracking-tight">MBM<span className="text-cyan-400">Chat</span></span>
+          </div>
 
-        <div className="flex items-center gap-3 font-mono text-xs">
-          {ADMIN_EMAILS.includes(studentEmail) && (
-            <a
-              href="/admin"
-              className="px-2.5 py-1 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 font-bold text-[10px] hover:bg-rose-900 transition"
-            >
-              Admin Desk
-            </a>
-          )}
-
-          <button 
-            onClick={() => setActiveTab('profile')}
-            className="px-3 py-1 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 flex items-center gap-2 transition"
-          >
-            {renderAuthorName(studentName, studentEmail)}
-          </button>
-          <button onClick={handleLogout} className="text-slate-500 hover:text-rose-400 p-1" title="Sign out">
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Grid */}
-      <div className="flex-1 max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 pb-16 md:pb-0">
-        
-        {/* Navigation Sidebar */}
-        <aside className="hidden md:flex md:col-span-3 border-r border-white/5 p-4 flex-col justify-between font-mono text-xs">
-          <div className="space-y-1">
-            <div className="text-[10px] uppercase text-slate-500 px-3 py-1 font-bold">Main Menu</div>
-            {[
-              { id: 'home', label: 'Dashboard', icon: Home },
-              { id: 'feed', label: 'Student Opinions', icon: MessageCircle },
-              { id: 'confessions', label: 'Confessions', icon: Lock },
-              { id: 'chats', label: 'Classmate Chats', icon: MessageSquare, badge: chatPeers.length },
-              { id: 'wall', label: 'Campus Wall & Snaps', icon: Camera },
-              { id: 'market', label: 'Marketplace', icon: ShoppingBag, badge: marketItems.length },
-              { id: 'events', label: 'Events Hub', icon: Calendar, badge: eventsList.length },
-              { id: 'settings', label: 'Settings', icon: Settings },
-            ].map(item => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id as any)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition ${
-                  activeTab === item.id 
-                    ? 'bg-indigo-600 text-white font-bold shadow-md' 
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                }`}
+          <div className="flex items-center gap-3 font-mono text-xs">
+            {ADMIN_EMAILS.includes(studentEmail) && (
+              <a
+                href="/admin"
+                className="px-2.5 py-1 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 font-bold text-[10px] hover:bg-rose-900 transition"
               >
-                <div className="flex items-center gap-2.5">
-                  <item.icon className="w-4 h-4" />
-                  <span>{item.label}</span>
-                </div>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded-md text-slate-300">
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+                Admin Desk
+              </a>
+            )}
 
-          <div 
-            onClick={() => setActiveTab('profile')}
-            className="p-3 rounded-2xl bg-[#070b14] border border-white/5 hover:border-white/20 cursor-pointer flex items-center gap-3 transition"
-          >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center font-bold text-white text-xs">
-              {studentName ? studentName.slice(0, 2).toUpperCase() : 'MB'}
-            </div>
-            <div className="truncate">
-              <div>{renderAuthorName(studentName, studentEmail)}</div>
-              <div className="text-cyan-400 text-[10px]">{branch} • {year}</div>
-            </div>
+            <button 
+              onClick={() => setActiveTab('profile')}
+              className="px-3 py-1 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 flex items-center gap-2 transition"
+            >
+              {renderAuthorName(studentName, studentEmail)}
+            </button>
+            <button onClick={handleLogout} className="text-slate-500 hover:text-rose-400 p-1" title="Sign out">
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-        </aside>
+        </header>
 
-        {/* Central Viewport */}
-        <main className="col-span-1 md:col-span-6 p-4 sm:p-6 overflow-y-auto">
+        {/* Main Grid */}
+        <div className="max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 py-4">
           
-          {/* TAB: DASHBOARD */}
-          {activeTab === 'home' && (
-            <div className="space-y-5 font-sans">
-              <div className="p-5 rounded-3xl bg-gradient-to-r from-indigo-950/40 to-[#070b14] border border-white/10">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-black font-mono text-white">Welcome,</h2>
-                  {renderAuthorName(studentName, studentEmail)}
-                </div>
-                <p className="text-xs text-slate-400 font-mono mt-1">{branch} • {year} • Roll No: {rollNo}</p>
-              </div>
-
-              <div className="grid grid-cols-4 gap-2 text-center font-mono text-[10px]">
-                {[
-                  { label: "Opinion", icon: MessageCircle, color: "text-indigo-400", act: () => setActiveTab('feed') },
-                  { label: "Confess", icon: Lock, color: "text-purple-400", act: () => setActiveTab('confessions') },
-                  { label: "Market", icon: ShoppingBag, color: "text-emerald-400", act: () => setActiveTab('market') },
-                  { label: "Events", icon: Calendar, color: "text-cyan-400", act: () => setActiveTab('events') },
-                ].map((a, i) => (
-                  <button key={i} onClick={a.act} className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/15 transition flex flex-col items-center gap-1">
-                    <a.icon className={`w-5 h-5 ${a.color}`} />
-                    <span className="text-slate-300">{a.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="p-5 rounded-3xl bg-[#070b14] border border-white/5 space-y-3 font-mono text-xs">
-                <div className="text-[10px] uppercase text-slate-500 font-bold tracking-wider">Campus Bio</div>
-                <p className="text-slate-300 text-sm italic font-sans">"{studentBio}"</p>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {studentInterests.map((interest, idx) => (
-                    <span key={idx} className="px-2.5 py-1 rounded-lg bg-indigo-950 border border-indigo-800 text-indigo-300 text-[10px]">
-                      #{interest}
+          {/* Navigation Sidebar */}
+          <aside className="hidden md:flex md:col-span-3 border-r border-white/5 p-4 flex-col justify-between font-mono text-xs">
+            <div className="space-y-1">
+              <div className="text-[10px] uppercase text-slate-500 px-3 py-1 font-bold">Main Menu</div>
+              {[
+                { id: 'home', label: 'Dashboard', icon: Home },
+                { id: 'feed', label: 'Student Opinions', icon: MessageCircle },
+                { id: 'confessions', label: 'Confessions', icon: Lock },
+                { id: 'chats', label: 'Classmate Chats', icon: MessageSquare, badge: chatPeers.length },
+                { id: 'wall', label: 'Campus Wall & Snaps', icon: Camera },
+                { id: 'market', label: 'Marketplace', icon: ShoppingBag, badge: marketItems.length },
+                { id: 'events', label: 'Events Hub', icon: Calendar, badge: eventsList.length },
+                { id: 'settings', label: 'Settings', icon: Settings },
+              ].map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id as any)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition ${
+                    activeTab === item.id 
+                      ? 'bg-indigo-600 text-white font-bold shadow-md' 
+                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <item.icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                  </div>
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded-md text-slate-300">
+                      {item.badge}
                     </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div 
+              onClick={() => setActiveTab('profile')}
+              className="p-3 rounded-2xl bg-[#070b14] border border-white/5 hover:border-white/20 cursor-pointer flex items-center gap-3 transition"
+            >
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center font-bold text-white text-xs">
+                {studentName ? studentName.slice(0, 2).toUpperCase() : 'MB'}
+              </div>
+              <div className="truncate">
+                <div>{renderAuthorName(studentName, studentEmail)}</div>
+                <div className="text-cyan-400 text-[10px]">{branch} • {year}</div>
+              </div>
+            </div>
+          </aside>
+
+          {/* Central Viewport */}
+          <main className="col-span-1 md:col-span-6 p-4 sm:p-6 overflow-y-auto">
+            
+            {/* TAB: DASHBOARD */}
+            {activeTab === 'home' && (
+              <div className="space-y-5 font-sans">
+                <div className="p-5 rounded-3xl bg-gradient-to-r from-indigo-950/40 to-[#070b14] border border-white/10">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-black font-mono text-white">Welcome,</h2>
+                    {renderAuthorName(studentName, studentEmail)}
+                  </div>
+                  <p className="text-xs text-slate-400 font-mono mt-1">{branch} • {year} • Roll No: {rollNo}</p>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 text-center font-mono text-[10px]">
+                  {[
+                    { label: "Opinion", icon: MessageCircle, color: "text-indigo-400", act: () => setActiveTab('feed') },
+                    { label: "Confess", icon: Lock, color: "text-purple-400", act: () => setActiveTab('confessions') },
+                    { label: "Market", icon: ShoppingBag, color: "text-emerald-400", act: () => setActiveTab('market') },
+                    { label: "Events", icon: Calendar, color: "text-cyan-400", act: () => setActiveTab('events') },
+                  ].map((a, i) => (
+                    <button key={i} onClick={a.act} className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/15 transition flex flex-col items-center gap-1">
+                      <a.icon className={`w-5 h-5 ${a.color}`} />
+                      <span className="text-slate-300">{a.label}</span>
+                    </button>
                   ))}
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* TAB: STUDENT OPEN OPINIONS & POSTS */}
-          {activeTab === 'feed' && (
-            <div className="space-y-4 font-sans">
-              <div className="p-4 rounded-2xl bg-[#070b14] border border-white/10 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-slate-400">Share Campus Opinion</span>
-                </div>
-                <textarea 
-                  rows={3} 
-                  value={postDraft}
-                  onChange={e => setPostDraft(e.target.value)}
-                  placeholder="What's your opinion on college labs, events, or mess?" 
-                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 resize-none"
-                />
-                <div className="flex justify-end">
-                  <button onClick={submitPost} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold rounded-xl shadow transition flex items-center gap-1.5">
-                    <span>Post Opinion</span>
-                    <Send className="w-3.5 h-3.5" />
-                  </button>
+                <div className="p-5 rounded-3xl bg-[#070b14] border border-white/5 space-y-3 font-mono text-xs">
+                  <div className="text-[10px] uppercase text-slate-500 font-bold tracking-wider">Campus Bio</div>
+                  <p className="text-slate-300 text-sm italic font-sans">"{studentBio}"</p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {studentInterests.map((interest, idx) => (
+                      <span key={idx} className="px-2.5 py-1 rounded-lg bg-indigo-950 border border-indigo-800 text-indigo-300 text-[10px]">
+                        #{interest}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div className="space-y-4">
-                {posts.map(post => {
-                  const postComments = comments.filter(c => c.parent_id === post.id);
-                  const isAuthorOrAdmin = (post.author_email === studentEmail) || ADMIN_EMAILS.includes(studentEmail);
+            {/* TAB: STUDENT OPEN OPINIONS & POSTS */}
+            {activeTab === 'feed' && (
+              <div className="space-y-4 font-sans">
+                <div className="p-4 rounded-2xl bg-[#070b14] border border-white/10 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-slate-400">Share Campus Opinion</span>
+                  </div>
+                  <textarea 
+                    rows={3} 
+                    value={postDraft}
+                    onChange={e => setPostDraft(e.target.value)}
+                    placeholder="What's your opinion on college labs, events, or mess?" 
+                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 resize-none"
+                  />
+                  <div className="flex justify-end">
+                    <button onClick={submitPost} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold rounded-xl shadow transition flex items-center gap-1.5">
+                      <span>Post Opinion</span>
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
 
-                  return (
-                    <div key={post.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          {renderAuthorName(post.author_name, post.author_email)}
-                          <div className="text-[10px] font-mono text-slate-500">{post.branch} • {post.year}</div>
+                <div className="space-y-4">
+                  {posts.map(post => {
+                    const postComments = comments.filter(c => c.parent_id === post.id);
+                    const isAuthorOrAdmin = (post.author_email === studentEmail) || ADMIN_EMAILS.includes(studentEmail);
+
+                    return (
+                      <div key={post.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            {renderAuthorName(post.author_name, post.author_email)}
+                            <div className="text-[10px] font-mono text-slate-500">{post.branch} • {post.year}</div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {isAuthorOrAdmin && (
+                              <button
+                                onClick={() => handleDeletePost(post.id, post.author_email)}
+                                className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
+                                title="Delete this post"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleReport('post', post.id)}
+                              className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg hover:bg-white/5 transition"
+                              title="Report post to Admin Desk"
+                            >
+                              <Flag className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                          {isAuthorOrAdmin && (
+                        <p className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap">{post.content}</p>
+
+                        <div className="flex items-center gap-4 pt-2 border-t border-white/5 text-xs font-mono text-slate-400">
+                          <button 
+                            onClick={() => handleLikePost(post.id, post.likes)} 
+                            className="flex items-center gap-1.5 hover:text-rose-400 transition"
+                          >
+                            <Heart className={`w-4 h-4 ${post.likes > 0 ? 'text-rose-500 fill-rose-500' : ''}`} />
+                            <span>{post.likes || 0}</span>
+                          </button>
+
+                          <button 
+                            onClick={() => setActiveCommentBox(activeCommentBox === post.id ? null : post.id)} 
+                            className="flex items-center gap-1.5 hover:text-cyan-400 transition"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            <span>{postComments.length} Comments</span>
+                          </button>
+                        </div>
+
+                        {activeCommentBox === post.id && (
+                          <div className="pt-3 space-y-2 border-t border-white/5">
+                            {postComments.map(c => (
+                              <div key={c.id} className="p-2.5 rounded-xl bg-black/40 border border-white/5 text-xs flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    {renderAuthorName(c.author_name, c.author_email)}
+                                  </div>
+                                  <p className="text-slate-300 font-sans text-xs">{renderCommentText(c.comment_text)}</p>
+                                </div>
+                                <button
+                                  onClick={() => handleReport('post', c.id)}
+                                  className="text-slate-600 hover:text-amber-400 p-1"
+                                  title="Report comment"
+                                >
+                                  <Flag className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+
+                            <div className="flex gap-2 pt-2">
+                              <input
+                                type="text"
+                                value={commentDrafts[post.id] || ''}
+                                onChange={e => setCommentDrafts({ ...commentDrafts, [post.id]: e.target.value })}
+                                onKeyDown={e => e.key === 'Enter' && handleSendComment(post.id, 'post')}
+                                placeholder="Add a comment... (Type @name to tag a peer)"
+                                className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-indigo-500 font-sans"
+                              />
+                              <button 
+                                onClick={() => handleSendComment(post.id, 'post')} 
+                                className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: CONFESSIONS */}
+            {activeTab === 'confessions' && (
+              <div className="space-y-4 font-sans">
+                <div className="p-4 rounded-3xl bg-gradient-to-r from-purple-950/40 to-black/40 border border-purple-800/30 flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-900/60 border border-purple-600 text-purple-300 flex items-center justify-center font-bold">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black font-mono text-white">Campus Confessions</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Anonymous messages. Comments can tag friends.</p>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-[#070b14] border border-white/10 space-y-2.5">
+                  <textarea 
+                    rows={2} 
+                    value={confessionDraft}
+                    onChange={e => setConfessionDraft(e.target.value)}
+                    placeholder="Share an anonymous confession or story..." 
+                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-600 outline-none focus:border-purple-500 resize-none"
+                  />
+                  <div className="flex items-center justify-between">
+                    <select 
+                      value={confessionTag}
+                      onChange={e => setConfessionTag(e.target.value)}
+                      className="bg-black/60 border border-white/10 rounded-lg text-[10px] font-mono text-purple-300 px-2.5 py-1 outline-none"
+                    >
+                      <option value="General">General</option>
+                      <option value="Academics">Academics</option>
+                      <option value="Hostel">Hostel</option>
+                      <option value="Department">Department</option>
+                    </select>
+                    <button onClick={submitConfession} className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-bold rounded-xl shadow transition">
+                      Post Anonymously
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {confessions.map(c => {
+                    const confComments = comments.filter(comm => comm.parent_id === c.id);
+                    return (
+                      <div key={c.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 space-y-2">
+                        <div className="flex justify-between items-center text-[10px] font-mono">
+                          <span className="text-purple-400 font-bold flex items-center gap-1">
+                            <Lock className="w-3 h-3" /> Anonymous • {c.tag}
+                          </span>
+                          <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleDeletePost(post.id, post.author_email)}
-                              className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
-                              title="Delete this post"
+                              onClick={() => handleReport('confession', c.id)}
+                              className="text-slate-500 hover:text-rose-400 p-1"
+                              title="Report Confession"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Flag className="w-3 h-3" />
                             </button>
-                          )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-200">{c.content}</p>
+
+                        <div className="pt-2 border-t border-white/5 flex items-center gap-3">
+                          <button 
+                            onClick={() => setActiveCommentBox(activeCommentBox === c.id ? null : c.id)}
+                            className="text-[11px] font-mono text-slate-400 hover:text-purple-300 flex items-center gap-1"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span>{confComments.length} Comments</span>
+                          </button>
+                        </div>
+
+                        {activeCommentBox === c.id && (
+                          <div className="pt-2 space-y-2 border-t border-white/5">
+                            {confComments.map(com => (
+                              <div key={com.id} className="p-2 rounded-xl bg-black/40 border border-white/5 text-xs">
+                                <span className="text-[10px] text-purple-400 font-mono block">Peer:</span>
+                                <p className="text-slate-300 font-sans text-xs">{renderCommentText(com.comment_text)}</p>
+                              </div>
+                            ))}
+
+                            <div className="flex gap-2 pt-1">
+                              <input
+                                type="text"
+                                value={commentDrafts[c.id] || ''}
+                                onChange={e => setCommentDrafts({ ...commentDrafts, [c.id]: e.target.value })}
+                                onKeyDown={e => e.key === 'Enter' && handleSendComment(c.id, 'confession')}
+                                placeholder="Comment anonymously... (Use @Name to mention)"
+                                className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-purple-500 font-sans"
+                              />
+                              <button 
+                                onClick={() => handleSendComment(c.id, 'confession')} 
+                                className="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: CHATS (ADD FRIENDS & P2P CHAT) */}
+            {activeTab === 'chats' && (
+              <div className="space-y-4 font-sans">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-bold font-mono text-white">Direct P2P Chats</h2>
+                    <p className="text-xs text-slate-400 font-mono">Add friends and chat securely.</p>
+                  </div>
+                  <button 
+                    onClick={handleAddFriend} 
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Add Friends</span>
+                  </button>
+                </div>
+
+                {chatPeers.length === 0 ? (
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
+                    <MessageSquare className="w-10 h-10 text-slate-700 mx-auto mb-1" />
+                    <h4 className="text-sm font-bold text-slate-300">No friends added yet</h4>
+                    <p className="text-xs text-slate-500">Click "Add Friends" above to add classmates for direct chatting.</p>
+                  </div>
+                ) : selectedPeer ? (
+                  <div className="h-[70vh] rounded-3xl bg-[#070b14] border border-white/10 flex flex-col justify-between overflow-hidden shadow-xl">
+                    <div className="p-3.5 border-b border-white/5 flex items-center justify-between bg-black/20">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-indigo-950 text-indigo-300 flex items-center justify-center font-mono font-bold text-xs border border-indigo-700">
+                          {selectedPeer.initials}
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white">{selectedPeer.name}</div>
+                          <div className="text-[10px] font-mono text-emerald-400">P2P Secure Channel</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleRemoveFriend(selectedPeer.id, selectedPeer.name)}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
+                          title="Remove friend"
+                        >
+                          <UserMinus className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setSelectedPeer(null)} className="p-1 text-slate-500 hover:text-white">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 flex-1 overflow-y-auto space-y-2 text-xs">
+                      {messages
+                        .filter(m => (m.sender_name === studentName && m.receiver_name === selectedPeer.name) || (m.sender_name === selectedPeer.name && m.receiver_name === studentName))
+                        .map(m => (
+                          <div key={m.id} className={`flex ${m.sender_name === studentName ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`p-3 rounded-2xl max-w-[80%] ${m.sender_name === studentName ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-[#0f1523] border border-white/10 text-slate-200 rounded-tl-none'}`}>
+                              <p>{m.text}</p>
+                              <span className="text-[9px] font-mono opacity-60 block text-right mt-1">
+                                {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+
+                    <div className="p-2.5 border-t border-white/5 flex items-center gap-2 bg-black/30">
+                      <input 
+                        type="text" 
+                        value={chatDraft}
+                        onChange={e => setChatDraft(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && sendP2PMessage()}
+                        placeholder={`Message ${selectedPeer.name}...`}
+                        className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500 font-sans"
+                      />
+                      <button onClick={sendP2PMessage} className="p-2 bg-indigo-600 text-white rounded-xl">
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {chatPeers.map(p => (
+                      <div key={p.id} className="p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/5 border border-white/5 flex items-center justify-between transition">
+                        <div onClick={() => setSelectedPeer(p)} className="flex items-center gap-3 cursor-pointer flex-1">
+                          <div className="w-10 h-10 rounded-full bg-indigo-950 text-indigo-300 flex items-center justify-center font-mono font-bold text-xs">
+                            {p.initials}
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-white">{p.name}</div>
+                            <div className="text-[10px] text-slate-500 font-mono">Tap to open P2P chat</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => handleRemoveFriend(p.id, p.name)}
+                            className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
+                            title="Remove friend"
+                          >
+                            <UserMinus className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setSelectedPeer(p)} className="text-xs font-mono text-cyan-400 hover:underline">
+                            Chat →
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB: CAMPUS WALL & SNAPS */}
+            {activeTab === 'wall' && (
+              <div className="space-y-4 font-sans">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-bold font-mono text-white">Campus Wall & Snaps</h2>
+                    <p className="text-xs text-slate-400 font-mono">Live departmental photo moments.</p>
+                  </div>
+                  <button 
+                    onClick={() => startCamera()} 
+                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Take Snap</span>
+                  </button>
+                </div>
+
+                {publicSnaps.length === 0 ? (
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
+                    <Camera className="w-10 h-10 text-amber-400/50 mx-auto mb-1" />
+                    <h4 className="text-sm font-bold text-slate-300">No active snaps on wall</h4>
+                    <p className="text-xs text-slate-500">Tap "Take Snap" above to share the first moment.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {publicSnaps.map(snap => (
+                      <div key={snap.id} className="rounded-2xl overflow-hidden bg-[#070b14] border border-white/10 space-y-2 shadow-xl">
+                        <div className="relative aspect-[3/4]">
+                          <img src={snap.imageUrl} alt="Public Snap" className="w-full h-full object-cover" />
+                          <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur border border-white/10 font-mono text-[10px] text-white">
+                            {snap.sender} • {snap.branch}
+                          </div>
                           <button
-                            onClick={() => handleReport('post', post.id)}
-                            className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg hover:bg-white/5 transition"
-                            title="Report post to Admin Desk"
+                            onClick={() => handleReport('snap', snap.id)}
+                            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-slate-300 hover:text-rose-400"
+                            title="Report Snap"
+                          >
+                            <Flag className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="p-3 font-mono text-xs flex justify-between items-center">
+                          <span className="text-slate-300">{snap.caption}</span>
+                          <span className="text-[10px] text-slate-500">{snap.timestamp}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB: MARKETPLACE */}
+            {activeTab === 'market' && (
+              <div className="space-y-4 font-sans">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-bold font-mono text-white">MBM Student Marketplace</h2>
+                    <p className="text-xs text-slate-400 font-mono">Buy, sell, or rent drafters, lab aprons, books, and calculators.</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowMarketModal(true)} 
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>List Item</span>
+                  </button>
+                </div>
+
+                {marketItems.length === 0 ? (
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
+                    <ShoppingBag className="w-10 h-10 text-emerald-500/50 mx-auto mb-1" />
+                    <h4 className="text-sm font-bold text-slate-300">No items listed yet</h4>
+                    <p className="text-xs text-slate-500">List an engineering drafter, scientific calculator, or notes.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {marketItems.map(item => (
+                      <div key={item.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 flex flex-col justify-between gap-3">
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-400 font-mono text-[9px] font-bold">
+                              {item.category || 'Supplies'}
+                            </span>
+                            <span className="text-emerald-400 font-mono font-black text-sm">
+                              {item.price}
+                            </span>
+                          </div>
+                          <h4 className="text-white font-bold text-sm mt-2">{item.title}</h4>
+                          <div className="text-[11px] text-slate-400 font-mono mt-1">
+                            Seller: {item.seller}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono">
+                          <span className="text-cyan-400">📞 {item.contact || 'Chat in App'}</span>
+                          <button 
+                            onClick={() => handleReport('market', item.id)}
+                            className="text-slate-500 hover:text-amber-400 p-1"
+                            title="Report listing"
                           >
                             <Flag className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
-
-                      <p className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap">{post.content}</p>
-
-                      <div className="flex items-center gap-4 pt-2 border-t border-white/5 text-xs font-mono text-slate-400">
-                        <button 
-                          onClick={() => handleLikePost(post.id, post.likes)} 
-                          className="flex items-center gap-1.5 hover:text-rose-400 transition"
-                        >
-                          <Heart className={`w-4 h-4 ${post.likes > 0 ? 'text-rose-500 fill-rose-500' : ''}`} />
-                          <span>{post.likes || 0}</span>
-                        </button>
-
-                        <button 
-                          onClick={() => setActiveCommentBox(activeCommentBox === post.id ? null : post.id)} 
-                          className="flex items-center gap-1.5 hover:text-cyan-400 transition"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                          <span>{postComments.length} Comments</span>
-                        </button>
-                      </div>
-
-                      {activeCommentBox === post.id && (
-                        <div className="pt-3 space-y-2 border-t border-white/5">
-                          {postComments.map(c => (
-                            <div key={c.id} className="p-2.5 rounded-xl bg-black/40 border border-white/5 text-xs flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  {renderAuthorName(c.author_name, c.author_email)}
-                                </div>
-                                <p className="text-slate-300 font-sans text-xs">{renderCommentText(c.comment_text)}</p>
-                              </div>
-                              <button
-                                onClick={() => handleReport('post', c.id)}
-                                className="text-slate-600 hover:text-amber-400 p-1"
-                                title="Report comment"
-                              >
-                                <Flag className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-
-                          <div className="flex gap-2 pt-2">
-                            <input
-                              type="text"
-                              value={commentDrafts[post.id] || ''}
-                              onChange={e => setCommentDrafts({ ...commentDrafts, [post.id]: e.target.value })}
-                              onKeyDown={e => e.key === 'Enter' && handleSendComment(post.id, 'post')}
-                              placeholder="Add a comment... (Type @name to tag a peer)"
-                              className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-indigo-500 font-sans"
-                            />
-                            <button 
-                              onClick={() => handleSendComment(post.id, 'post')} 
-                              className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs"
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* TAB: CONFESSIONS */}
-          {activeTab === 'confessions' && (
-            <div className="space-y-4 font-sans">
-              <div className="p-4 rounded-3xl bg-gradient-to-r from-purple-950/40 to-black/40 border border-purple-800/30 flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-2xl bg-purple-900/60 border border-purple-600 text-purple-300 flex items-center justify-center font-bold">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black font-mono text-white">Campus Confessions</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Anonymous messages. Comments can tag friends.</p>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#070b14] border border-white/10 space-y-2.5">
-                <textarea 
-                  rows={2} 
-                  value={confessionDraft}
-                  onChange={e => setConfessionDraft(e.target.value)}
-                  placeholder="Share an anonymous confession or story..." 
-                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-600 outline-none focus:border-purple-500 resize-none"
-                />
+            {/* TAB: EVENTS HUB */}
+            {activeTab === 'events' && (
+              <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
-                  <select 
-                    value={confessionTag}
-                    onChange={e => setConfessionTag(e.target.value)}
-                    className="bg-black/60 border border-white/10 rounded-lg text-[10px] font-mono text-purple-300 px-2.5 py-1 outline-none"
+                  <div>
+                    <h2 className="text-base font-bold font-mono text-white">University Events Hub</h2>
+                    <p className="text-xs text-slate-400 font-mono">Workshops, sports meets, cultural fests & departmental guest lectures.</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowEventModal(true)} 
+                    className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
                   >
-                    <option value="General">General</option>
-                    <option value="Academics">Academics</option>
-                    <option value="Hostel">Hostel</option>
-                    <option value="Department">Department</option>
-                  </select>
-                  <button onClick={submitConfession} className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-bold rounded-xl shadow transition">
-                    Post Anonymously
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Post Event</span>
                   </button>
                 </div>
-              </div>
 
-              <div className="space-y-3">
-                {confessions.map(c => {
-                  const confComments = comments.filter(comm => comm.parent_id === c.id);
-                  return (
-                    <div key={c.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 space-y-2">
-                      <div className="flex justify-between items-center text-[10px] font-mono">
-                        <span className="text-purple-400 font-bold flex items-center gap-1">
-                          <Lock className="w-3 h-3" /> Anonymous • {c.tag}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleReport('confession', c.id)}
-                            className="text-slate-500 hover:text-rose-400 p-1"
-                            title="Report Confession"
+                {eventsList.length === 0 ? (
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
+                    <Calendar className="w-10 h-10 text-cyan-500/50 mx-auto mb-1" />
+                    <h4 className="text-sm font-bold text-slate-300">No scheduled events right now</h4>
+                    <p className="text-xs text-slate-500">Be the first to announce a club meetup or departmental workshop.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {eventsList.map(ev => (
+                      <div key={ev.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <h4 className="text-white font-bold text-sm">{ev.title}</h4>
+                          <div className="text-[11px] font-mono text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
+                            <span>📅 {ev.date}</span>
+                            <span>📍 {ev.venue}</span>
+                            {ev.organizer && <span>🏛️ By: {ev.organizer}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button 
+                            onClick={() => handleReport('event', ev.id)}
+                            className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg hover:bg-white/5 transition"
+                            title="Report event"
                           >
-                            <Flag className="w-3 h-3" />
+                            <Flag className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
-                      <p className="text-xs text-slate-200">{c.content}</p>
-
-                      <div className="pt-2 border-t border-white/5 flex items-center gap-3">
-                        <button 
-                          onClick={() => setActiveCommentBox(activeCommentBox === c.id ? null : c.id)}
-                          className="text-[11px] font-mono text-slate-400 hover:text-purple-300 flex items-center gap-1"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                          <span>{confComments.length} Comments</span>
-                        </button>
-                      </div>
-
-                      {activeCommentBox === c.id && (
-                        <div className="pt-2 space-y-2 border-t border-white/5">
-                          {confComments.map(com => (
-                            <div key={com.id} className="p-2 rounded-xl bg-black/40 border border-white/5 text-xs">
-                              <span className="text-[10px] text-purple-400 font-mono block">Peer:</span>
-                              <p className="text-slate-300 font-sans text-xs">{renderCommentText(com.comment_text)}</p>
-                            </div>
-                          ))}
-
-                          <div className="flex gap-2 pt-1">
-                            <input
-                              type="text"
-                              value={commentDrafts[c.id] || ''}
-                              onChange={e => setCommentDrafts({ ...commentDrafts, [c.id]: e.target.value })}
-                              onKeyDown={e => e.key === 'Enter' && handleSendComment(c.id, 'confession')}
-                              placeholder="Comment anonymously... (Use @Name to mention)"
-                              className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-purple-500 font-sans"
-                            />
-                            <button 
-                              onClick={() => handleSendComment(c.id, 'confession')} 
-                              className="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs"
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* TAB: CHATS */}
-          {activeTab === 'chats' && (
-            <div className="space-y-4 font-sans">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold font-mono text-white">Classmate Discussions</h2>
-                  <p className="text-xs text-slate-400 font-mono">Confidential direct messages with your peers.</p>
-                </div>
-                <button 
-                  onClick={handleAddClassmate} 
-                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Add Classmate</span>
-                </button>
-              </div>
-
-              {chatPeers.length === 0 ? (
-                <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
-                  <MessageSquare className="w-10 h-10 text-slate-700 mx-auto mb-1" />
-                  <h4 className="text-sm font-bold text-slate-300">No active classmates added</h4>
-                  <p className="text-xs text-slate-500">Click "Add Classmate" above to add friends and begin messaging.</p>
-                </div>
-              ) : selectedPeer ? (
-                <div className="h-[70vh] rounded-3xl bg-[#070b14] border border-white/10 flex flex-col justify-between overflow-hidden shadow-xl">
-                  <div className="p-3.5 border-b border-white/5 flex items-center justify-between bg-black/20">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-indigo-950 text-indigo-300 flex items-center justify-center font-mono font-bold text-xs border border-indigo-700">
-                        {selectedPeer.initials}
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-white">{selectedPeer.name}</div>
-                        <div className="text-[10px] font-mono text-emerald-400">Direct Channel</div>
-                      </div>
+            {/* TAB: PROFILE */}
+            {activeTab === 'profile' && (
+              <div className="space-y-5 font-mono text-xs">
+                <div className="p-6 rounded-3xl bg-[#070b14] border border-white/10 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center text-xl font-bold text-white shadow-xl">
+                      {studentName ? studentName.slice(0, 2).toUpperCase() : 'MB'}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => handleRemoveClassmate(selectedPeer.id, selectedPeer.name)}
-                        className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
-                        title="Remove classmate"
-                      >
-                        <UserMinus className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setSelectedPeer(null)} className="p-1 text-slate-500 hover:text-white">
-                        <X className="w-4 h-4" />
-                      </button>
+                    <div>
+                      <div className="text-base">{renderAuthorName(studentName, studentEmail)}</div>
+                      <p className="text-slate-400 text-xs">{rollNo} • {branch}</p>
+                      <p className="text-cyan-400 text-[11px]">{year}</p>
                     </div>
                   </div>
 
-                  <div className="p-4 flex-1 overflow-y-auto space-y-2 text-xs">
-                    {messages
-                      .filter(m => (m.sender_name === studentName && m.receiver_name === selectedPeer.name) || (m.sender_name === selectedPeer.name && m.receiver_name === studentName))
-                      .map(m => (
-                        <div key={m.id} className={`flex ${m.sender_name === studentName ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`p-3 rounded-2xl max-w-[80%] ${m.sender_name === studentName ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-[#0f1523] border border-white/10 text-slate-200 rounded-tl-none'}`}>
-                            <p>{m.text}</p>
-                            <span className="text-[9px] font-mono opacity-60 block text-right mt-1">
-                              {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
+                  <div className="space-y-3 pt-3 border-t border-white/5">
+                    <div>
+                      <label className="text-slate-400 text-[11px] mb-1 block">Campus Bio (Persisted in DB)</label>
+                      <textarea 
+                        rows={3} 
+                        value={studentBio}
+                        onChange={e => setStudentBio(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs outline-none focus:border-indigo-500"
+                      />
+                    </div>
 
-                  <div className="p-2.5 border-t border-white/5 flex items-center gap-2 bg-black/30">
-                    <input 
-                      type="text" 
-                      value={chatDraft}
-                      onChange={e => setChatDraft(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                      placeholder={`Send a message to ${selectedPeer.name}...`}
-                      className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500 font-sans"
-                    />
-                    <button onClick={sendMessage} className="p-2 bg-indigo-600 text-white rounded-xl">
-                      <Send className="w-4 h-4" />
+                    <button 
+                      onClick={handleSaveBio}
+                      disabled={savingBio}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl mt-3 transition"
+                    >
+                      <span>{savingBio ? 'Saving...' : 'Save & Persist Changes'}</span>
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {chatPeers.map(p => (
-                    <div key={p.id} className="p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/5 border border-white/5 flex items-center justify-between transition">
-                      <div onClick={() => setSelectedPeer(p)} className="flex items-center gap-3 cursor-pointer flex-1">
-                        <div className="w-10 h-10 rounded-full bg-indigo-950 text-indigo-300 flex items-center justify-center font-mono font-bold text-xs">
-                          {p.initials}
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-white">{p.name}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">Tap to open discussion</div>
-                        </div>
-                      </div>
+              </div>
+            )}
 
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => handleRemoveClassmate(p.id, p.name)}
-                          className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
-                          title="Remove classmate"
-                        >
-                          <UserMinus className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setSelectedPeer(p)} className="text-xs font-mono text-cyan-400 hover:underline">
-                          Chat →
-                        </button>
-                      </div>
+            {/* TAB: SETTINGS */}
+            {activeTab === 'settings' && (
+              <div className="space-y-4 font-mono text-xs">
+                <h2 className="text-base font-bold text-white">Account & Preferences</h2>
+                <div className="p-5 rounded-3xl bg-[#070b14] border border-white/10 space-y-4">
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <div>
+                      <div className="text-white font-bold">{studentName}</div>
+                      <div className="text-slate-400 text-[11px]">{studentEmail} • {rollNo}</div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB: CAMPUS WALL & SNAPS */}
-          {activeTab === 'wall' && (
-            <div className="space-y-4 font-sans">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold font-mono text-white">Campus Wall & Snaps</h2>
-                  <p className="text-xs text-slate-400 font-mono">Live departmental photo moments.</p>
-                </div>
-                <button 
-                  onClick={() => startCamera()} 
-                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>Take Snap</span>
-                </button>
-              </div>
-
-              {publicSnaps.length === 0 ? (
-                <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
-                  <Camera className="w-10 h-10 text-amber-400/50 mx-auto mb-1" />
-                  <h4 className="text-sm font-bold text-slate-300">No active snaps on wall</h4>
-                  <p className="text-xs text-slate-500">Tap "Take Snap" above to share the first moment.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {publicSnaps.map(snap => (
-                    <div key={snap.id} className="rounded-2xl overflow-hidden bg-[#070b14] border border-white/10 space-y-2 shadow-xl">
-                      <div className="relative aspect-[3/4]">
-                        <img src={snap.imageUrl} alt="Public Snap" className="w-full h-full object-cover" />
-                        <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur border border-white/10 font-mono text-[10px] text-white">
-                          {snap.sender} • {snap.branch}
-                        </div>
-                        <button
-                          onClick={() => handleReport('snap', snap.id)}
-                          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-slate-300 hover:text-rose-400"
-                          title="Report Snap"
-                        >
-                          <Flag className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <div className="p-3 font-mono text-xs flex justify-between items-center">
-                        <span className="text-slate-300">{snap.caption}</span>
-                        <span className="text-[10px] text-slate-500">{snap.timestamp}</span>
-                      </div>
+                    <button onClick={handleLogout} className="px-3 py-1.5 bg-rose-950 border border-rose-800 text-rose-300 rounded-xl">
+                      Sign Out
+                    </button>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <div>
+                      <div className="text-white font-bold">MBM University Network</div>
+                      <div className="text-slate-400 text-[11px]">{branch} • {year}</div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB: MARKETPLACE */}
-          {activeTab === 'market' && (
-            <div className="space-y-4 font-sans">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold font-mono text-white">MBM Student Marketplace</h2>
-                  <p className="text-xs text-slate-400 font-mono">Buy, sell, or rent drafters, lab aprons, books, and calculators.</p>
-                </div>
-                <button 
-                  onClick={() => setShowMarketModal(true)} 
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>List Item</span>
-                </button>
-              </div>
-
-              {marketItems.length === 0 ? (
-                <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
-                  <ShoppingBag className="w-10 h-10 text-emerald-500/50 mx-auto mb-1" />
-                  <h4 className="text-sm font-bold text-slate-300">No items listed yet</h4>
-                  <p className="text-xs text-slate-500">List an engineering drafter, scientific calculator, or notes.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {marketItems.map(item => (
-                    <div key={item.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 flex flex-col justify-between gap-3">
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-400 font-mono text-[9px] font-bold">
-                            {item.category || 'Supplies'}
-                          </span>
-                          <span className="text-emerald-400 font-mono font-black text-sm">
-                            {item.price}
-                          </span>
-                        </div>
-                        <h4 className="text-white font-bold text-sm mt-2">{item.title}</h4>
-                        <div className="text-[11px] text-slate-400 font-mono mt-1">
-                          Seller: {item.seller}
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono">
-                        <span className="text-cyan-400">📞 {item.contact || 'Chat in App'}</span>
-                        <button 
-                          onClick={() => handleReport('market', item.id)}
-                          className="text-slate-500 hover:text-amber-400 p-1"
-                          title="Report listing"
-                        >
-                          <Flag className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB: EVENTS HUB */}
-          {activeTab === 'events' && (
-            <div className="space-y-4 font-sans">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold font-mono text-white">University Events Hub</h2>
-                  <p className="text-xs text-slate-400 font-mono">Workshops, sports meets, cultural fests & departmental guest lectures.</p>
-                </div>
-                <button 
-                  onClick={() => setShowEventModal(true)} 
-                  className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 shadow"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Post Event</span>
-                </button>
-              </div>
-
-              {eventsList.length === 0 ? (
-                <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2">
-                  <Calendar className="w-10 h-10 text-cyan-500/50 mx-auto mb-1" />
-                  <h4 className="text-sm font-bold text-slate-300">No scheduled events right now</h4>
-                  <p className="text-xs text-slate-500">Be the first to announce a club meetup or departmental workshop.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {eventsList.map(ev => (
-                    <div key={ev.id} className="p-4 rounded-2xl bg-[#070b14] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="space-y-1">
-                        <h4 className="text-white font-bold text-sm">{ev.title}</h4>
-                        <div className="text-[11px] font-mono text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
-                          <span>📅 {ev.date}</span>
-                          <span>📍 {ev.venue}</span>
-                          {ev.organizer && <span>🏛️ By: {ev.organizer}</span>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button 
-                          onClick={() => handleReport('event', ev.id)}
-                          className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg hover:bg-white/5 transition"
-                          title="Report event"
-                        >
-                          <Flag className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB: PROFILE */}
-          {activeTab === 'profile' && (
-            <div className="space-y-5 font-mono text-xs">
-              <div className="p-6 rounded-3xl bg-[#070b14] border border-white/10 space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center text-xl font-bold text-white shadow-xl">
-                    {studentName ? studentName.slice(0, 2).toUpperCase() : 'MB'}
+                    <span className="text-emerald-400 font-bold text-[10px]">CONNECTED</span>
                   </div>
-                  <div>
-                    <div className="text-base">{renderAuthorName(studentName, studentEmail)}</div>
-                    <p className="text-slate-400 text-xs">{rollNo} • {branch}</p>
-                    <p className="text-cyan-400 text-[11px]">{year}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-3 border-t border-white/5">
-                  <div>
-                    <label className="text-slate-400 text-[11px] mb-1 block">Campus Bio (Persisted in DB)</label>
-                    <textarea 
-                      rows={3} 
-                      value={studentBio}
-                      onChange={e => setStudentBio(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs outline-none focus:border-indigo-500"
-                    />
-                  </div>
-
-                  <button 
-                    onClick={handleSaveBio}
-                    disabled={savingBio}
-                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl mt-3 transition"
-                  >
-                    <span>{savingBio ? 'Saving...' : 'Save & Persist Changes'}</span>
-                  </button>
                 </div>
               </div>
+            )}
+
+          </main>
+
+          {/* Right Sidebar Quick Actions */}
+          <aside className="hidden md:block md:col-span-3 border-l border-white/5 p-4 space-y-4 font-mono text-xs">
+            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block">Campus Shortcuts</span>
+              <button onClick={() => setActiveTab('feed')} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow">
+                <MessageCircle className="w-4 h-4" />
+                <span>Post Opinion</span>
+              </button>
+              <button onClick={() => setShowMarketModal(true)} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow">
+                <ShoppingBag className="w-4 h-4" />
+                <span>Sell Item</span>
+              </button>
+              <button onClick={() => startCamera()} className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl flex items-center justify-center gap-2 shadow">
+                <Camera className="w-4 h-4" />
+                <span>Capture Snap</span>
+              </button>
             </div>
-          )}
+          </aside>
 
-          {/* TAB: SETTINGS */}
-          {activeTab === 'settings' && (
-            <div className="space-y-4 font-mono text-xs">
-              <h2 className="text-base font-bold text-white">Account & Preferences</h2>
-              <div className="p-5 rounded-3xl bg-[#070b14] border border-white/10 space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-white/5">
-                  <div>
-                    <div className="text-white font-bold">{studentName}</div>
-                    <div className="text-slate-400 text-[11px]">{studentEmail} • {rollNo}</div>
-                  </div>
-                  <button onClick={handleLogout} className="px-3 py-1.5 bg-rose-950 border border-rose-800 text-rose-300 rounded-xl">
-                    Sign Out
-                  </button>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <div>
-                    <div className="text-white font-bold">MBM University Network</div>
-                    <div className="text-slate-400 text-[11px]">{branch} • {year}</div>
-                  </div>
-                  <span className="text-emerald-400 font-bold text-[10px]">CONNECTED</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-        </main>
-
-        {/* Right Sidebar Quick Actions */}
-        <aside className="hidden md:block md:col-span-3 border-l border-white/5 p-4 space-y-4 font-mono text-xs">
-          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-            <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block">Campus Shortcuts</span>
-            <button onClick={() => setActiveTab('feed')} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow">
-              <MessageCircle className="w-4 h-4" />
-              <span>Post Opinion</span>
-            </button>
-            <button onClick={() => setShowMarketModal(true)} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow">
-              <ShoppingBag className="w-4 h-4" />
-              <span>Sell Item</span>
-            </button>
-            <button onClick={() => startCamera()} className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl flex items-center justify-center gap-2 shadow">
-              <Camera className="w-4 h-4" />
-              <span>Capture Snap</span>
-            </button>
-          </div>
-        </aside>
-
+        </div>
       </div>
+
+      {/* Footer on Main Dashboard */}
+      <footer className="w-full py-4 text-center font-mono text-[11px] text-slate-500 border-t border-white/5 space-y-1">
+        <p>© 2026 MBM University. All rights reserved. T&C Applied.</p>
+        <p className="text-indigo-400">Developed by Vineet Kaler</p>
+      </footer>
 
       {/* Modal: List Marketplace Item */}
       {showMarketModal && (
