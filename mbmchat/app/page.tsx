@@ -57,7 +57,7 @@ export default function MBMChatWorkspace() {
   const [studentBio, setStudentBio] = useState('Student at MBM University.');
   const [savingBio, setSavingBio] = useState(false);
 
-  // Live Real-time Camera Snaps State
+  // Real-Time Camera Stream State for Snaps
   const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('environment');
   const [capturedSnapUrl, setCapturedSnapUrl] = useState<string | null>(null);
   const [snapCaption, setSnapCaption] = useState('');
@@ -621,7 +621,7 @@ export default function MBMChatWorkspace() {
             <div className="md:col-span-5 p-8 flex flex-col justify-between bg-gradient-to-br from-indigo-950/60 via-[#060913] to-purple-950/40 border-r border-white/5">
               <div className="space-y-4">
                 <div className="flex items-center gap-2.5">
-                  <span className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-500 to-cyan-400 flex items-center justify-center font-mono font-black text-white shadow-lg shadow-pink-500/20 text-base">M</span>
+                  <span className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-500 to-cyan-400 flex items-center justify-center font-black text-white shadow-lg shadow-pink-500/20 text-base">M</span>
                   <h1 className="text-xl font-black tracking-tight text-white">MBM<span className="text-pink-400">Chat</span></h1>
                 </div>
                 <h2 className="text-2xl font-extrabold tracking-tight text-white leading-tight">
