@@ -1,0 +1,9 @@
+{
+  "name": "MBM Chat",
+  "short_name": "MBMChat",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020408",
+  "theme_color": "#020408",
+  "icons": []
+}
