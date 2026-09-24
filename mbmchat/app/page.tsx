@@ -57,14 +57,11 @@ export default function MBMChatWorkspace() {
   const [studentBio, setStudentBio] = useState('Student at MBM University.');
   const [savingBio, setSavingBio] = useState(false);
 
-  // Real-Time Camera Stream State for Snaps
-  const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('environment');
+  // Native Mobile Camera Snaps State
   const [capturedSnapUrl, setCapturedSnapUrl] = useState<string | null>(null);
   const [snapCaption, setSnapCaption] = useState('');
   const [publicSnaps, setPublicSnaps] = useState<any[]>([]);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const snapFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Friends, Requests & P2P Chat State
   const [chatPeers, setChatPeers] = useState<any[]>([]);
@@ -255,49 +252,6 @@ export default function MBMChatWorkspace() {
     return <span className="font-bold text-white tracking-wide">{authorName || 'Student'}</span>;
   };
 
-  // Real-Time Camera Stream Controls for Snaps
-  const startCamera = async (mode: 'user' | 'environment' = cameraFacingMode) => {
-    stopCamera();
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode },
-        audio: false
-      });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setCameraFacingMode(mode);
-      setIsCameraOpen(true);
-    } catch {
-      alert('Camera access denied or device unsupported. Please allow camera permission.');
-    }
-  };
-
-  const toggleCameraFacingMode = () => {
-    startCamera(cameraFacingMode === 'user' ? 'environment' : 'user');
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-    setIsCameraOpen(false);
-  };
-
-  const capturePhoto = () => {
-    if (!videoRef.current) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth || 720;
-    canvas.height = videoRef.current.videoHeight || 1280;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      setCapturedSnapUrl(canvas.toDataURL('image/jpeg', 0.90));
-      stopCamera();
-      setIsCameraOpen(true);
-    }
-  };
-
   const broadcastPublicSnap = () => {
     if (!capturedSnapUrl) return;
     const newSnap = {
@@ -313,7 +267,6 @@ export default function MBMChatWorkspace() {
     setPublicSnaps(prev => [newSnap, ...prev]);
     setCapturedSnapUrl(null);
     setSnapCaption('');
-    setIsCameraOpen(false);
     setActiveTab('wall');
   };
 
@@ -1161,16 +1114,55 @@ export default function MBMChatWorkspace() {
               </div>
             )}
 
-            {/* TAB: WALL (REAL-TIME MOBILE CAMERA STREAM) */}
+            {/* TAB: WALL (NATIVE MOBILE CAMERA CAPTURE FIX) */}
             {activeTab === 'wall' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-extrabold text-white">Campus Wall</h2>
-                  <button onClick={() => startCamera('environment')} className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 text-black text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    capture="environment" 
+                    ref={snapFileInputRef} 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setCapturedSnapUrl(event.target?.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }} 
+                    className="hidden" 
+                  />
+                  <button 
+                    onClick={() => snapFileInputRef.current?.click()} 
+                    className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 text-black text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg"
+                  >
                     <Camera className="w-3.5 h-3.5" />
                     <span>Take Snap</span>
                   </button>
                 </div>
+
+                {capturedSnapUrl && (
+                  <div className="p-5 rounded-3xl bg-[#060913] border border-white/10 space-y-3 shadow-2xl">
+                    <div className="relative aspect-[3/4] max-h-96 rounded-2xl overflow-hidden bg-black mx-auto">
+                      <img src={capturedSnapUrl} alt="Captured Snap" className="w-full h-full object-contain" />
+                    </div>
+                    <input 
+                      type="text" 
+                      value={snapCaption} 
+                      onChange={e => setSnapCaption(e.target.value)} 
+                      placeholder="Add a caption to your snap..." 
+                      className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-xs text-white outline-none focus:border-amber-500 font-sans" 
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={() => setCapturedSnapUrl(null)} className="flex-1 py-2.5 bg-white/5 text-white rounded-xl text-xs font-bold">Retake</button>
+                      <button onClick={broadcastPublicSnap} className="flex-1 py-2.5 bg-amber-500 text-black rounded-xl text-xs font-extrabold shadow">Post to Wall</button>
+                    </div>
+                  </div>
+                )}
 
                 {publicSnaps.length === 0 ? (
                   <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center text-slate-500 text-xs bg-[#060913]/50 font-medium">No active snaps on wall. Be the first!</div>
@@ -1306,72 +1298,32 @@ export default function MBMChatWorkspace() {
                 <ShoppingBag className="w-4 h-4 text-emerald-400" />
                 <span>Sell Item</span>
               </button>
-              <button onClick={() => startCamera('environment')} className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition">
+              <button onClick={() => snapFileInputRef.current?.click()} className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition">
                 <Camera className="w-4 h-4 text-amber-400" />
                 <span>Capture Snap</span>
               </button>
+              <input 
+                type="file" 
+                accept="image/*" 
+                capture="environment" 
+                ref={snapFileInputRef} 
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      setCapturedSnapUrl(event.target?.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }} 
+                className="hidden" 
+              />
             </div>
           </aside>
 
         </div>
       </div>
-
-      {/* Real-time Live Camera Stream Modal */}
-      {isCameraOpen && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between p-4 font-sans">
-          <div className="flex items-center justify-between z-10 pt-2">
-            <button onClick={stopCamera} className="p-3 rounded-full bg-black/60 text-white border border-white/20">
-              <X className="w-5 h-5" />
-            </button>
-            <span className="text-xs text-amber-400 font-bold px-4 py-1.5 bg-black/60 rounded-full border border-white/20">
-              {cameraFacingMode === 'environment' ? 'BACK CAMERA' : 'FRONT CAMERA'}
-            </span>
-            <button onClick={toggleCameraFacingMode} className="p-3 rounded-full bg-black/60 text-white border border-white/20">
-              <SwitchCamera className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="flex-1 my-4 rounded-3xl overflow-hidden bg-[#060913] relative flex items-center justify-center border border-white/20 shadow-2xl">
-            {capturedSnapUrl ? (
-              <img src={capturedSnapUrl} alt="Captured" className="w-full h-full object-cover" />
-            ) : (
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                muted 
-                className={`w-full h-full object-cover ${cameraFacingMode === 'user' ? 'transform -scale-x-100' : ''}`} 
-              />
-            )}
-          </div>
-
-          <div className="flex flex-col items-center gap-3 pb-4">
-            {capturedSnapUrl ? (
-              <div className="w-full max-w-sm space-y-3">
-                <input 
-                  type="text" 
-                  value={snapCaption}
-                  onChange={e => setSnapCaption(e.target.value)}
-                  placeholder="Add a caption..." 
-                  className="w-full bg-black/70 border border-white/20 rounded-xl px-4 py-3 text-white text-xs outline-none font-sans"
-                />
-                <div className="flex gap-3">
-                  <button onClick={() => { setCapturedSnapUrl(null); startCamera(cameraFacingMode); }} className="flex-1 py-3 bg-white/10 text-white rounded-xl text-xs font-bold">
-                    Retake
-                  </button>
-                  <button onClick={broadcastPublicSnap} className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-black font-extrabold rounded-xl text-xs shadow-lg">
-                    Post to Wall
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button onClick={capturePhoto} className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center p-1.5 bg-white/20 active:scale-95 transition shadow-2xl">
-                <div className="w-14 h-14 rounded-full bg-white"></div>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Mobile Fixed Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-[#060913]/95 backdrop-blur-2xl border-t border-white/10 px-4 flex items-center justify-around z-40 shadow-2xl font-semibold">
