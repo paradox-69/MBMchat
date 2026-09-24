@@ -57,11 +57,14 @@ export default function MBMChatWorkspace() {
   const [studentBio, setStudentBio] = useState('Student at MBM University.');
   const [savingBio, setSavingBio] = useState(false);
 
-  // Camera & Mobile High-Quality Snap State
+  // Live Real-time Camera Snaps State
+  const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('environment');
   const [capturedSnapUrl, setCapturedSnapUrl] = useState<string | null>(null);
   const [snapCaption, setSnapCaption] = useState('');
   const [publicSnaps, setPublicSnaps] = useState<any[]>([]);
-  const snapFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Friends, Requests & P2P Chat State
   const [chatPeers, setChatPeers] = useState<any[]>([]);
@@ -243,25 +246,56 @@ export default function MBMChatWorkspace() {
     if (isAdmin) {
       return (
         <span className="inline-flex items-center gap-1">
-          <span className="font-bold text-white">Vineet Kaler</span>
+          <span className="font-bold text-white tracking-wide">Vineet Kaler</span>
           <span className="text-[10px] opacity-60 text-slate-300 font-normal">(Admin)</span>
-          <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 fill-cyan-400/20" />
+          <CheckCircle2 className="w-3.5 h-3.5 text-pink-400 fill-pink-400/20" />
         </span>
       );
     }
-    return <span className="font-bold text-white">{authorName || 'Student'}</span>;
+    return <span className="font-bold text-white tracking-wide">{authorName || 'Student'}</span>;
   };
 
-  // High-Quality Mobile Snap Handler
-  const handleSnapFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Real-Time Camera Stream Controls for Snaps
+  const startCamera = async (mode: 'user' | 'environment' = cameraFacingMode) => {
+    stopCamera();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: mode },
+        audio: false
+      });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setCameraFacingMode(mode);
+      setIsCameraOpen(true);
+    } catch {
+      alert('Camera access denied or device unsupported. Please allow camera permission.');
+    }
+  };
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setCapturedSnapUrl(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+  const toggleCameraFacingMode = () => {
+    startCamera(cameraFacingMode === 'user' ? 'environment' : 'user');
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth || 720;
+    canvas.height = videoRef.current.videoHeight || 1280;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      setCapturedSnapUrl(canvas.toDataURL('image/jpeg', 0.90));
+      stopCamera();
+      setIsCameraOpen(true);
+    }
   };
 
   const broadcastPublicSnap = () => {
@@ -279,6 +313,7 @@ export default function MBMChatWorkspace() {
     setPublicSnaps(prev => [newSnap, ...prev]);
     setCapturedSnapUrl(null);
     setSnapCaption('');
+    setIsCameraOpen(false);
     setActiveTab('wall');
   };
 
@@ -577,27 +612,27 @@ export default function MBMChatWorkspace() {
     window.location.reload();
   };
 
-  // Auth Screen (Gen-Z Neon Glow)
+  // Auth Screen (Gen-Z Neon Glow with Plus Jakarta Sans Font)
   if (!sessionActive) {
     return (
-      <div className="min-h-screen bg-[#020408] text-slate-100 flex flex-col items-center justify-between p-4 sm:p-8 font-sans selection:bg-pink-500 selection:text-white">
+      <div className="min-h-screen bg-[#020408] text-slate-100 flex flex-col items-center justify-between p-4 sm:p-8 font-['Plus_Jakarta_Sans',sans-serif] selection:bg-pink-500 selection:text-white">
         <div className="w-full flex-1 flex items-center justify-center">
           <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-12 rounded-3xl overflow-hidden border border-white/10 bg-[#060913] shadow-2xl backdrop-blur-xl">
             <div className="md:col-span-5 p-8 flex flex-col justify-between bg-gradient-to-br from-indigo-950/60 via-[#060913] to-purple-950/40 border-r border-white/5">
               <div className="space-y-4">
                 <div className="flex items-center gap-2.5">
                   <span className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-500 to-cyan-400 flex items-center justify-center font-mono font-black text-white shadow-lg shadow-pink-500/20 text-base">M</span>
-                  <h1 className="text-xl font-black font-mono tracking-tight text-white">MBM<span className="text-pink-400">Chat</span></h1>
+                  <h1 className="text-xl font-black tracking-tight text-white">MBM<span className="text-pink-400">Chat</span></h1>
                 </div>
-                <h2 className="text-2xl font-black font-mono tracking-tight text-white leading-tight">
+                <h2 className="text-2xl font-extrabold tracking-tight text-white leading-tight">
                   MBM University<br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-cyan-400">Gen-Z Campus Vibe</span>
                 </h2>
-                <p className="text-xs font-mono text-slate-400 leading-relaxed">
-                  Anonymous confessions, secure P2P chats, campus snaps, and exclusive student network.
+                <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                  Anonymous confessions, secure P2P chats, live campus snaps, and exclusive student network.
                 </p>
               </div>
               <div className="hidden md:block pt-6">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/30 text-pink-400 font-mono text-[10px]">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/30 text-pink-400 text-[10px] font-semibold">
                   <Sparkles className="w-3 h-3 animate-pulse" /> Verified MBM Students Only
                 </span>
               </div>
@@ -605,44 +640,44 @@ export default function MBMChatWorkspace() {
 
             <div className="md:col-span-7 p-6 sm:p-8 flex flex-col justify-center bg-[#060913]">
               <div className="max-w-md mx-auto w-full space-y-5">
-                <div className="grid grid-cols-2 p-1 bg-white/5 border border-white/10 rounded-2xl font-mono text-xs">
+                <div className="grid grid-cols-2 p-1 bg-white/5 border border-white/10 rounded-2xl text-xs font-semibold">
                   <button 
                     onClick={() => { setAuthMode('login'); setAuthStep('details'); }}
-                    className={`py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 ${authMode === 'login' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-white'}`}
+                    className={`py-2.5 rounded-xl transition flex items-center justify-center gap-2 ${authMode === 'login' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-white'}`}
                   >
                     <LogIn className="w-3.5 h-3.5" />
                     <span>Sign In</span>
                   </button>
                   <button 
                     onClick={() => { setAuthMode('register'); setAuthStep('details'); }}
-                    className={`py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 ${authMode === 'register' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-white'}`}
+                    className={`py-2.5 rounded-xl transition flex items-center justify-center gap-2 ${authMode === 'register' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-white'}`}
                   >
                     <UserPlus className="w-3.5 h-3.5" />
                     <span>Registration</span>
                   </button>
                 </div>
 
-                <div className="space-y-3 font-mono text-xs">
+                <div className="space-y-3 text-xs">
                   {authMode === 'register' && authStep === 'details' && (
                     <>
                       <div>
-                        <label className="text-slate-400 text-[11px] mb-1 block">Full Name</label>
-                        <input type="text" value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="e.g. Vineet Kaler" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition" />
+                        <label className="text-slate-400 text-[11px] mb-1 block font-medium">Full Name</label>
+                        <input type="text" value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="e.g. Vineet Kaler" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition font-sans" />
                       </div>
                       <div>
-                        <label className="text-slate-400 text-[11px] mb-1 block">Roll Number</label>
-                        <input type="text" value={rollNo} onChange={e => setRollNo(e.target.value)} placeholder="e.g. 23UFIEXXXX" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition" />
+                        <label className="text-slate-400 text-[11px] mb-1 block font-medium">Roll Number</label>
+                        <input type="text" value={rollNo} onChange={e => setRollNo(e.target.value)} placeholder="e.g. 23UFIEXXXX" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition font-sans" />
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
-                          <label className="text-slate-400 text-[11px] mb-1 block">Department / Branch</label>
-                          <select value={branch} onChange={e => setBranch(e.target.value)} className="w-full bg-[#0a0f1d] border border-white/10 rounded-xl px-3 py-3 text-white text-xs outline-none focus:border-pink-500 transition">
+                          <label className="text-slate-400 text-[11px] mb-1 block font-medium">Department / Branch</label>
+                          <select value={branch} onChange={e => setBranch(e.target.value)} className="w-full bg-[#0a0f1d] border border-white/10 rounded-xl px-3 py-3 text-white text-xs outline-none focus:border-pink-500 transition font-sans">
                             {MBM_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
                           </select>
                         </div>
                         <div>
-                          <label className="text-slate-400 text-[11px] mb-1 block">Academic Year</label>
-                          <select value={year} onChange={e => setYear(e.target.value)} className="w-full bg-[#0a0f1d] border border-white/10 rounded-xl px-3 py-3 text-white text-xs outline-none focus:border-pink-500 transition">
+                          <label className="text-slate-400 text-[11px] mb-1 block font-medium">Academic Year</label>
+                          <select value={year} onChange={e => setYear(e.target.value)} className="w-full bg-[#0a0f1d] border border-white/10 rounded-xl px-3 py-3 text-white text-xs outline-none focus:border-pink-500 transition font-sans">
                             <option value="1st Year">1st Year</option>
                             <option value="2nd Year">2nd Year</option>
                             <option value="3rd Year">3rd Year</option>
@@ -651,14 +686,14 @@ export default function MBMChatWorkspace() {
                         </div>
                       </div>
                       <div>
-                        <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
-                        <input type="email" value={studentEmail} onChange={e => setStudentEmail(e.target.value)} placeholder="student@example.com" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition" />
+                        <label className="text-slate-400 text-[11px] mb-1 block font-medium">Email Address</label>
+                        <input type="email" value={studentEmail} onChange={e => setStudentEmail(e.target.value)} placeholder="student@example.com" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition font-sans" />
                       </div>
                       <div>
-                        <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
-                        <input type="password" value={studentPassword} onChange={e => setStudentPassword(e.target.value)} placeholder="••••••••" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition" />
+                        <label className="text-slate-400 text-[11px] mb-1 block font-medium">Password</label>
+                        <input type="password" value={studentPassword} onChange={e => setStudentPassword(e.target.value)} placeholder="••••••••" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition font-sans" />
                       </div>
-                      <button onClick={handleSendRegistrationOtp} disabled={authLoading} className="w-full py-3.5 mt-2 bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:opacity-90 text-white font-mono font-bold text-xs rounded-xl shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition active:scale-[0.98]">
+                      <button onClick={handleSendRegistrationOtp} disabled={authLoading} className="w-full py-3.5 mt-2 bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:opacity-90 text-white font-bold text-xs rounded-xl shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition active:scale-[0.98]">
                         <span>{authLoading ? 'Sending Code...' : 'Send 6-Digit OTP →'}</span>
                         <ArrowRight className="w-4 h-4" />
                       </button>
@@ -672,10 +707,10 @@ export default function MBMChatWorkspace() {
                         <p className="font-bold text-white text-xs">{studentEmail}</p>
                       </div>
                       <div>
-                        <label className="text-slate-400 text-[11px] mb-1 block text-center">Enter 6-Digit Email OTP</label>
-                        <input type="text" maxLength={8} value={otpCode} onChange={e => setOtpCode(e.target.value)} placeholder="••••••" className="w-full bg-black/50 border border-white/20 rounded-2xl px-4 py-3.5 text-center tracking-[0.5em] text-xl font-bold text-cyan-400 outline-none focus:border-pink-500" />
+                        <label className="text-slate-400 text-[11px] mb-1 block text-center font-medium">Enter 6-Digit Email OTP</label>
+                        <input type="text" maxLength={8} value={otpCode} onChange={e => setOtpCode(e.target.value)} placeholder="••••••" className="w-full bg-black/50 border border-white/20 rounded-2xl px-4 py-3.5 text-center tracking-[0.5em] text-xl font-bold text-cyan-400 outline-none focus:border-pink-500 font-sans" />
                       </div>
-                      <button onClick={handleVerifyOtp} disabled={authLoading} className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white font-mono font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition">
+                      <button onClick={handleVerifyOtp} disabled={authLoading} className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition">
                         <span>{authLoading ? 'Verifying...' : 'Verify OTP & Enter MBM Chat'}</span>
                       </button>
                       <button onClick={() => setAuthStep('details')} className="w-full text-center text-[11px] text-slate-400 hover:text-white pt-2">
@@ -687,14 +722,14 @@ export default function MBMChatWorkspace() {
                   {authMode === 'login' && (
                     <>
                       <div>
-                        <label className="text-slate-400 text-[11px] mb-1 block">Email Address</label>
-                        <input type="email" value={studentEmail} onChange={e => setStudentEmail(e.target.value)} placeholder="student@example.com" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition" />
+                        <label className="text-slate-400 text-[11px] mb-1 block font-medium">Email Address</label>
+                        <input type="email" value={studentEmail} onChange={e => setStudentEmail(e.target.value)} placeholder="student@example.com" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition font-sans" />
                       </div>
                       <div>
-                        <label className="text-slate-400 text-[11px] mb-1 block">Password</label>
-                        <input type="password" value={studentPassword} onChange={e => setStudentPassword(e.target.value)} placeholder="••••••••" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition" />
+                        <label className="text-slate-400 text-[11px] mb-1 block font-medium">Password</label>
+                        <input type="password" value={studentPassword} onChange={e => setStudentPassword(e.target.value)} placeholder="••••••••" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-white outline-none focus:border-pink-500 transition font-sans" />
                       </div>
-                      <button onClick={handlePasswordLogin} disabled={authLoading} className="w-full py-3.5 mt-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-mono font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition active:scale-[0.98]">
+                      <button onClick={handlePasswordLogin} disabled={authLoading} className="w-full py-3.5 mt-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition active:scale-[0.98]">
                         <span>{authLoading ? 'Signing In...' : 'Sign In'}</span>
                         <ArrowRight className="w-4 h-4" />
                       </button>
@@ -706,7 +741,7 @@ export default function MBMChatWorkspace() {
           </div>
         </div>
 
-        <footer className="w-full py-4 text-center font-mono text-[11px] text-slate-500 border-t border-white/5 space-y-1 mt-6">
+        <footer className="w-full py-4 text-center text-[11px] text-slate-500 border-t border-white/5 space-y-1 mt-6">
           <p>© 2026 MBM Students only. All rights reserved. T&C Applied.</p>
           <p className="text-pink-400 font-bold">Developed by Vineet Kaler</p>
         </footer>
@@ -715,7 +750,7 @@ export default function MBMChatWorkspace() {
   }
 
   return (
-    <div className="min-h-screen bg-[#020408] text-slate-100 flex flex-col justify-between font-sans selection:bg-pink-500 selection:text-white">
+    <div className="min-h-screen bg-[#020408] text-slate-100 flex flex-col justify-between font-['Plus_Jakarta_Sans',sans-serif] selection:bg-pink-500 selection:text-white">
       <div>
         {/* Top Header Bar */}
         <header className="h-16 border-b border-white/10 bg-[#060913]/90 backdrop-blur-xl sticky top-0 z-50 px-4 sm:px-6 flex items-center justify-between shadow-lg">
@@ -724,12 +759,12 @@ export default function MBMChatWorkspace() {
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-xl bg-gradient-to-tr from-pink-500 via-purple-500 to-cyan-400 flex items-center justify-center font-mono font-black text-white text-sm shadow-md shadow-pink-500/20">M</span>
-              <span className="font-mono font-black text-white text-base tracking-tight">MBM<span className="text-pink-400">Chat</span></span>
+              <span className="w-8 h-8 rounded-xl bg-gradient-to-tr from-pink-500 via-purple-500 to-cyan-400 flex items-center justify-center font-black text-white text-sm shadow-md shadow-pink-500/20">M</span>
+              <span className="font-extrabold text-white text-base tracking-tight">MBM<span className="text-pink-400">Chat</span></span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 font-mono text-xs">
+          <div className="flex items-center gap-3 text-xs font-medium">
             {ADMIN_EMAILS.includes(studentEmail) && (
               <a href="/admin" className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-950 to-red-950 border border-rose-800 text-rose-300 font-bold text-[10px] hover:opacity-90 transition shadow-sm">
                 Admin Desk
@@ -756,7 +791,7 @@ export default function MBMChatWorkspace() {
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-x-0 top-16 bg-[#060913]/95 backdrop-blur-2xl border-b border-white/10 p-4 z-40 space-y-1 font-mono text-xs">
+          <div className="md:hidden fixed inset-x-0 top-16 bg-[#060913]/95 backdrop-blur-2xl border-b border-white/10 p-4 z-40 space-y-1 text-xs font-semibold">
             {[
               { id: 'home', label: 'Dashboard', icon: Home },
               { id: 'feed', label: 'Student Opinions', icon: MessageCircle },
@@ -793,7 +828,7 @@ export default function MBMChatWorkspace() {
         <div className="max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 py-4 px-2 sm:px-4">
           
           {/* Desktop Navigation Sidebar */}
-          <aside className="hidden md:flex md:col-span-3 border-r border-white/10 p-4 flex-col justify-between font-mono text-xs">
+          <aside className="hidden md:flex md:col-span-3 border-r border-white/10 p-4 flex-col justify-between text-xs font-semibold">
             <div className="space-y-1.5">
               <div className="text-[10px] uppercase text-slate-500 px-3 py-1 font-bold tracking-wider">Main Menu</div>
               {[
@@ -845,22 +880,22 @@ export default function MBMChatWorkspace() {
             
             {/* TAB: DASHBOARD */}
             {activeTab === 'home' && (
-              <div className="space-y-5 font-sans">
+              <div className="space-y-5">
                 <div className="p-6 rounded-3xl bg-gradient-to-r from-indigo-950/60 via-[#060913] to-purple-950/40 border border-white/10 shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                     <Flame className="w-32 h-32 text-pink-500" />
                   </div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-black font-mono text-white">Welcome back,</h2>
+                    <h2 className="text-xl font-extrabold text-white">Welcome back,</h2>
                     {renderAuthorName(studentName, studentEmail)}
                   </div>
-                  <p className="text-xs text-slate-400 font-mono mt-1 flex items-center gap-1">
+                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1 font-medium">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                     {branch} • {year} • Roll: {rollNo}
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center font-mono text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center text-xs font-semibold">
                   {[
                     { label: "Opinion", icon: MessageCircle, color: "text-indigo-400", bg: "from-indigo-950/50 to-transparent", act: () => setActiveTab('feed') },
                     { label: "Confess", icon: Lock, color: "text-purple-400", bg: "from-purple-950/50 to-transparent", act: () => setActiveTab('confessions') },
@@ -876,19 +911,19 @@ export default function MBMChatWorkspace() {
                   ))}
                 </div>
 
-                <div className="p-5 rounded-3xl bg-[#060913] border border-white/10 space-y-3 font-mono text-xs shadow-xl">
+                <div className="p-5 rounded-3xl bg-[#060913] border border-white/10 space-y-3 text-xs shadow-xl font-medium">
                   <div className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Campus Bio</div>
-                  <p className="text-slate-200 text-sm italic font-sans">"{studentBio}"</p>
+                  <p className="text-slate-200 text-sm italic">"{studentBio}"</p>
                 </div>
               </div>
             )}
 
-            {/* TAB: STUDENT OPINIONS WITH PHOTO/VIDEO UPLOAD */}
+            {/* TAB: STUDENT OPINIONS */}
             {activeTab === 'feed' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="p-4 sm:p-5 rounded-3xl bg-[#060913] border border-white/10 space-y-3 shadow-xl">
-                  <span className="text-xs font-mono font-bold text-slate-400">Share Campus Opinion (Text, Photo or Video)</span>
-                  <textarea rows={3} value={postDraft} onChange={e => setPostDraft(e.target.value)} placeholder="What's your opinion on college labs, events, or mess?" className="w-full bg-black/50 border border-white/10 rounded-2xl p-3.5 text-xs text-white placeholder-slate-600 outline-none focus:border-pink-500 resize-none transition" />
+                  <span className="text-xs font-bold text-slate-400">Share Campus Opinion (Text, Photo or Video)</span>
+                  <textarea rows={3} value={postDraft} onChange={e => setPostDraft(e.target.value)} placeholder="What's your opinion on college labs, events, or mess?" className="w-full bg-black/50 border border-white/10 rounded-2xl p-3.5 text-xs text-white placeholder-slate-600 outline-none focus:border-pink-500 resize-none transition font-sans" />
                   
                   {postMediaUrl && (
                     <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black">
@@ -901,12 +936,12 @@ export default function MBMChatWorkspace() {
 
                   <div className="flex items-center justify-between pt-1">
                     <input type="file" accept="image/*,video/*" ref={postMediaInputRef} onChange={handlePostMediaSelected} className="hidden" />
-                    <button onClick={() => postMediaInputRef.current?.click()} className="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-cyan-400 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 transition">
+                    <button onClick={() => postMediaInputRef.current?.click()} className="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-cyan-400 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition">
                       <ImageIcon className="w-4 h-4" />
                       <span>Add Photo/Video</span>
                     </button>
 
-                    <button onClick={submitPost} className="px-5 py-2.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 text-white text-xs font-mono font-bold rounded-xl shadow-lg transition flex items-center gap-2">
+                    <button onClick={submitPost} className="px-5 py-2.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
                       <span>Post Opinion</span>
                       <Send className="w-3.5 h-3.5" />
                     </button>
@@ -931,7 +966,7 @@ export default function MBMChatWorkspace() {
                         <div className="flex justify-between items-start">
                           <div>
                             {renderAuthorName(post.author_name, post.author_email)}
-                            <div className="text-[10px] font-mono text-slate-500 mt-0.5">{post.branch} • {post.year}</div>
+                            <div className="text-[10px] text-slate-500 mt-0.5 font-medium">{post.branch} • {post.year}</div>
                           </div>
                           <div className="flex items-center gap-1.5">
                             {isAuthorOrAdmin && (
@@ -946,7 +981,7 @@ export default function MBMChatWorkspace() {
                         </div>
 
                         {displayContent.trim() && (
-                          <p className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+                          <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">{displayContent}</p>
                         )}
 
                         {mediaAttachment && (
@@ -955,7 +990,7 @@ export default function MBMChatWorkspace() {
                           </div>
                         )}
 
-                        <div className="flex items-center gap-4 pt-3 border-t border-white/5 text-xs font-mono text-slate-400">
+                        <div className="flex items-center gap-4 pt-3 border-t border-white/5 text-xs font-semibold text-slate-400">
                           <button onClick={() => handleLikePost(post.id, post.likes)} className="flex items-center gap-1.5 hover:text-pink-400 transition">
                             <Heart className={`w-4 h-4 ${post.likes > 0 ? 'text-pink-500 fill-pink-500' : ''}`} />
                             <span>{post.likes || 0}</span>
@@ -974,27 +1009,27 @@ export default function MBMChatWorkspace() {
 
             {/* TAB: CONFESSIONS */}
             {activeTab === 'confessions' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="p-5 rounded-3xl bg-gradient-to-r from-purple-950/60 via-[#060913] to-pink-950/40 border border-purple-800/30 flex items-center gap-4 shadow-xl">
                   <div className="w-12 h-12 rounded-2xl bg-purple-900/60 border border-purple-500/50 text-purple-300 flex items-center justify-center font-bold shadow-lg">
                     <Lock className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black font-mono text-white">Campus Confessions</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">100% Anonymous student secrets & stories.</p>
+                    <h3 className="text-sm font-extrabold text-white">Campus Confessions</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 font-medium">100% Anonymous student secrets & stories.</p>
                   </div>
                 </div>
 
                 <div className="p-4 sm:p-5 rounded-3xl bg-[#060913] border border-white/10 space-y-3 shadow-xl">
-                  <textarea rows={2} value={confessionDraft} onChange={e => setConfessionDraft(e.target.value)} placeholder="Share an anonymous confession..." className="w-full bg-black/50 border border-white/10 rounded-2xl p-3.5 text-xs text-white placeholder-slate-600 outline-none focus:border-purple-500 resize-none transition" />
+                  <textarea rows={2} value={confessionDraft} onChange={e => setConfessionDraft(e.target.value)} placeholder="Share an anonymous confession..." className="w-full bg-black/50 border border-white/10 rounded-2xl p-3.5 text-xs text-white placeholder-slate-600 outline-none focus:border-purple-500 resize-none transition font-sans" />
                   <div className="flex items-center justify-between">
-                    <select value={confessionTag} onChange={e => setConfessionTag(e.target.value)} className="bg-black/60 border border-white/10 rounded-xl text-xs font-mono text-purple-300 px-3 py-2 outline-none">
+                    <select value={confessionTag} onChange={e => setConfessionTag(e.target.value)} className="bg-black/60 border border-white/10 rounded-xl text-xs font-semibold text-purple-300 px-3 py-2 outline-none">
                       <option value="General">General</option>
                       <option value="Academics">Academics</option>
                       <option value="Hostel">Hostel</option>
                       <option value="Crush">Crush</option>
                     </select>
-                    <button onClick={submitConfession} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-bold rounded-xl shadow-lg transition">
+                    <button onClick={submitConfession} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg transition">
                       Post Anonymously
                     </button>
                   </div>
@@ -1003,7 +1038,7 @@ export default function MBMChatWorkspace() {
                 <div className="space-y-3">
                   {confessions.map(c => (
                     <div key={c.id} className="p-4 rounded-3xl bg-[#060913] border border-white/10 space-y-2 shadow-xl">
-                      <span className="text-[10px] font-mono text-purple-400 font-bold block">🔒 Anonymous • {c.tag}</span>
+                      <span className="text-[10px] text-purple-400 font-bold block">🔒 Anonymous • {c.tag}</span>
                       <p className="text-xs text-slate-200 font-sans">{c.content}</p>
                     </div>
                   ))}
@@ -1013,20 +1048,20 @@ export default function MBMChatWorkspace() {
 
             {/* TAB: CHATS */}
             {activeTab === 'chats' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-bold font-mono text-white">Classmate Chats</h2>
-                    <p className="text-xs text-slate-400 font-mono">Secure P2P connections.</p>
+                    <h2 className="text-base font-extrabold text-white">Classmate Chats</h2>
+                    <p className="text-xs text-slate-400 font-medium">Secure P2P connections.</p>
                   </div>
-                  <button onClick={() => setShowAddFriendModal(true)} className="px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 text-white text-xs font-mono font-bold rounded-xl flex items-center gap-2 shadow-lg">
+                  <button onClick={() => setShowAddFriendModal(true)} className="px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg">
                     <UserPlus className="w-3.5 h-3.5" />
                     <span>Add Friends</span>
                   </button>
                 </div>
 
                 {chatPeers.length === 0 ? (
-                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono space-y-2 bg-[#060913]/50">
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center space-y-2 bg-[#060913]/50">
                     <MessageSquare className="w-10 h-10 text-slate-600 mx-auto mb-1" />
                     <h4 className="text-sm font-bold text-slate-300">No active chat connections</h4>
                     <p className="text-xs text-slate-500">Send friend requests via "Add Friends". Chat unlocks once accepted!</p>
@@ -1035,12 +1070,12 @@ export default function MBMChatWorkspace() {
                   <div className="h-[70vh] rounded-3xl bg-[#060913] border border-white/10 flex flex-col justify-between overflow-hidden shadow-2xl">
                     <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-pink-950 text-pink-300 flex items-center justify-center font-mono font-bold text-xs border border-pink-700/50 shadow">
+                        <div className="w-9 h-9 rounded-xl bg-pink-950 text-pink-300 flex items-center justify-center font-bold text-xs border border-pink-700/50 shadow">
                           {selectedPeer.initials}
                         </div>
                         <div>
                           <div className="text-xs font-bold text-white">{selectedPeer.name}</div>
-                          <div className="text-[10px] font-mono text-emerald-400">Connected P2P</div>
+                          <div className="text-[10px] text-emerald-400 font-medium">Connected P2P</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1077,15 +1112,15 @@ export default function MBMChatWorkspace() {
                     {chatPeers.map(p => (
                       <div key={p.email} className="p-4 rounded-2xl bg-[#060913] border border-white/10 hover:border-white/20 flex items-center justify-between transition shadow-xl">
                         <div onClick={() => setSelectedPeer(p)} className="flex items-center gap-3.5 cursor-pointer flex-1">
-                          <div className="w-10 h-10 rounded-xl bg-pink-950 text-pink-300 flex items-center justify-center font-mono font-bold text-xs border border-pink-700/40">
+                          <div className="w-10 h-10 rounded-xl bg-pink-950 text-pink-300 flex items-center justify-center font-bold text-xs border border-pink-700/40">
                             {p.initials}
                           </div>
                           <div>
                             <div className="text-xs font-bold text-white">{p.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">Tap to open chat</div>
+                            <div className="text-[10px] text-slate-400 font-medium">Tap to open chat</div>
                           </div>
                         </div>
-                        <button onClick={() => setSelectedPeer(p)} className="text-xs font-mono text-pink-400 hover:underline font-bold">
+                        <button onClick={() => setSelectedPeer(p)} className="text-xs text-pink-400 hover:underline font-bold">
                           Chat →
                         </button>
                       </div>
@@ -1097,23 +1132,23 @@ export default function MBMChatWorkspace() {
 
             {/* TAB: NOTIFICATIONS */}
             {activeTab === 'notifications' && (
-              <div className="space-y-4 font-sans">
-                <h2 className="text-base font-bold font-mono text-white flex items-center gap-2">
+              <div className="space-y-4">
+                <h2 className="text-base font-extrabold text-white flex items-center gap-2">
                   <Bell className="w-4 h-4 text-pink-400" />
                   <span>Friend Requests ({friendRequests.length})</span>
                 </h2>
 
                 {friendRequests.length === 0 ? (
-                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono text-slate-500 text-xs bg-[#060913]/50">
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center text-slate-500 text-xs bg-[#060913]/50 font-medium">
                     No pending friend requests right now.
                   </div>
                 ) : (
-                  <div className="space-y-2.5 font-mono text-xs">
+                  <div className="space-y-2.5 text-xs font-semibold">
                     {friendRequests.map(req => (
                       <div key={req.id} className="p-4 rounded-2xl bg-[#060913] border border-white/10 flex items-center justify-between shadow-xl">
                         <div>
                           <div className="font-bold text-white text-sm">{req.sender_name}</div>
-                          <div className="text-[10px] text-slate-400 mt-0.5">Wants to connect with you</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 font-medium">Wants to connect with you</div>
                         </div>
                         <button onClick={() => handleAcceptRequest(req.id)} className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-lg">
                           <Check className="w-3.5 h-3.5" />
@@ -1126,44 +1161,30 @@ export default function MBMChatWorkspace() {
               </div>
             )}
 
-            {/* TAB: WALL */}
+            {/* TAB: WALL (REAL-TIME MOBILE CAMERA STREAM) */}
             {activeTab === 'wall' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold font-mono text-white">Campus Wall</h2>
-                  <input type="file" accept="image/*" capture="environment" ref={snapFileInputRef} onChange={handleSnapFileSelected} className="hidden" />
-                  <button onClick={() => snapFileInputRef.current?.click()} className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 text-black text-xs font-mono font-bold rounded-xl flex items-center gap-2 shadow-lg">
+                  <h2 className="text-base font-extrabold text-white">Campus Wall</h2>
+                  <button onClick={() => startCamera('environment')} className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 text-black text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg">
                     <Camera className="w-3.5 h-3.5" />
                     <span>Take Snap</span>
                   </button>
                 </div>
 
-                {capturedSnapUrl && (
-                  <div className="p-5 rounded-3xl bg-[#060913] border border-white/10 space-y-3 shadow-2xl">
-                    <div className="relative aspect-[3/4] max-h-96 rounded-2xl overflow-hidden bg-black mx-auto">
-                      <img src={capturedSnapUrl} alt="Captured Snap" className="w-full h-full object-contain" />
-                    </div>
-                    <input type="text" value={snapCaption} onChange={e => setSnapCaption(e.target.value)} placeholder="Add a caption to your snap..." className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-xs text-white outline-none focus:border-amber-500" />
-                    <div className="flex gap-2">
-                      <button onClick={() => setCapturedSnapUrl(null)} className="flex-1 py-2.5 bg-white/5 text-white rounded-xl text-xs font-mono font-bold">Retake</button>
-                      <button onClick={broadcastPublicSnap} className="flex-1 py-2.5 bg-amber-500 text-black rounded-xl text-xs font-mono font-bold shadow">Post to Wall</button>
-                    </div>
-                  </div>
-                )}
-
                 {publicSnaps.length === 0 ? (
-                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono text-slate-500 text-xs bg-[#060913]/50">No active snaps on wall. Be the first!</div>
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center text-slate-500 text-xs bg-[#060913]/50 font-medium">No active snaps on wall. Be the first!</div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {publicSnaps.map(snap => (
                       <div key={snap.id} className="rounded-3xl overflow-hidden bg-[#060913] border border-white/10 space-y-2 shadow-2xl">
                         <div className="relative aspect-[3/4]">
                           <img src={snap.imageUrl} alt="Snap" className="w-full h-full object-cover" />
-                          <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur font-mono text-[10px] text-white">
+                          <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur text-[10px] text-white font-semibold">
                             {snap.sender} • {snap.branch}
                           </div>
                         </div>
-                        <div className="p-3 font-mono text-xs flex justify-between text-slate-300">
+                        <div className="p-3 text-xs flex justify-between text-slate-300 font-medium">
                           <span>{snap.caption}</span>
                           <span className="text-[10px] text-slate-500">{snap.timestamp}</span>
                         </div>
@@ -1176,23 +1197,23 @@ export default function MBMChatWorkspace() {
 
             {/* TAB: MARKETPLACE */}
             {activeTab === 'market' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold font-mono text-white">Student Marketplace</h2>
-                  <button onClick={() => setShowMarketModal(true)} className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white text-xs font-mono font-bold rounded-xl shadow-lg">List Item</button>
+                  <h2 className="text-base font-extrabold text-white">Student Marketplace</h2>
+                  <button onClick={() => setShowMarketModal(true)} className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg">List Item</button>
                 </div>
                 {marketItems.length === 0 ? (
-                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono text-slate-500 text-xs bg-[#060913]/50">No items listed.</div>
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center text-slate-500 text-xs bg-[#060913]/50 font-medium">No items listed.</div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {marketItems.map(item => (
                       <div key={item.id} className="p-4 rounded-2xl bg-[#060913] border border-white/10 flex flex-col justify-between gap-3 shadow-xl">
                         <div>
-                          <span className="text-emerald-400 font-mono font-black text-sm">{item.price}</span>
+                          <span className="text-emerald-400 font-black text-sm">{item.price}</span>
                           <h4 className="text-white font-bold text-sm mt-2">{item.title}</h4>
-                          <div className="text-[11px] text-slate-400 font-mono mt-1">Seller: {item.seller}</div>
+                          <div className="text-[11px] text-slate-400 mt-1 font-medium">Seller: {item.seller}</div>
                         </div>
-                        <div className="text-[11px] font-mono text-cyan-400 pt-2 border-t border-white/5">📞 {item.contact || 'Chat in App'}</div>
+                        <div className="text-[11px] text-cyan-400 pt-2 border-t border-white/5 font-semibold">📞 {item.contact || 'Chat in App'}</div>
                       </div>
                     ))}
                   </div>
@@ -1202,20 +1223,20 @@ export default function MBMChatWorkspace() {
 
             {/* TAB: EVENTS */}
             {activeTab === 'events' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold font-mono text-white">Events Hub</h2>
-                  <button onClick={() => setShowEventModal(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:opacity-90 text-white text-xs font-mono font-bold rounded-xl shadow-lg">Post Event</button>
+                  <h2 className="text-base font-extrabold text-white">Events Hub</h2>
+                  <button onClick={() => setShowEventModal(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg">Post Event</button>
                 </div>
                 {eventsList.length === 0 ? (
-                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono text-slate-500 text-xs bg-[#060913]/50">No upcoming events.</div>
+                  <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center text-slate-500 text-xs bg-[#060913]/50 font-medium">No upcoming events.</div>
                 ) : (
                   <div className="space-y-3">
                     {eventsList.map(ev => (
                       <div key={ev.id} className="p-4 rounded-2xl bg-[#060913] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
                         <div className="space-y-1">
                           <h4 className="text-white font-bold text-sm">{ev.title}</h4>
-                          <div className="text-[11px] font-mono text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
+                          <div className="text-[11px] text-slate-400 flex flex-wrap gap-x-4 gap-y-1 font-medium">
                             <span>📅 {ev.date}</span>
                             <span>📍 {ev.venue}</span>
                           </div>
@@ -1229,22 +1250,22 @@ export default function MBMChatWorkspace() {
 
             {/* TAB: PROFILE */}
             {activeTab === 'profile' && (
-              <div className="space-y-5 font-mono text-xs">
+              <div className="space-y-5 text-xs font-semibold">
                 <div className="p-6 rounded-3xl bg-[#060913] border border-white/10 space-y-4 shadow-2xl">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white shadow-xl shadow-pink-500/20">
                       {studentName ? studentName.slice(0, 2).toUpperCase() : 'MB'}
                     </div>
                     <div>
-                      <div className="text-base">{renderAuthorName(studentName, studentEmail)}</div>
-                      <p className="text-slate-400 text-xs mt-0.5">{rollNo} • {branch}</p>
-                      <p className="text-pink-400 text-[11px] mt-0.5">{year}</p>
+                      <div className="text-base font-extrabold">{renderAuthorName(studentName, studentEmail)}</div>
+                      <p className="text-slate-400 text-xs mt-0.5 font-medium">{rollNo} • {branch}</p>
+                      <p className="text-pink-400 text-[11px] mt-0.5 font-bold">{year}</p>
                     </div>
                   </div>
 
                   <div className="space-y-3 pt-3 border-t border-white/10">
                     <div>
-                      <label className="text-slate-400 text-[11px] mb-1 block">Campus Bio</label>
+                      <label className="text-slate-400 text-[11px] mb-1 block font-medium">Campus Bio</label>
                       <textarea rows={3} value={studentBio} onChange={e => setStudentBio(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded-2xl p-3.5 text-white text-xs outline-none focus:border-pink-500 font-sans" />
                     </div>
                     <button onClick={handleSaveBio} disabled={savingBio} className="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 text-white font-bold rounded-xl mt-3 transition shadow-lg">
@@ -1257,13 +1278,13 @@ export default function MBMChatWorkspace() {
 
             {/* TAB: SETTINGS */}
             {activeTab === 'settings' && (
-              <div className="space-y-4 font-mono text-xs">
-                <h2 className="text-base font-bold text-white">Account & Preferences</h2>
+              <div className="space-y-4 text-xs font-semibold">
+                <h2 className="text-base font-extrabold text-white">Account & Preferences</h2>
                 <div className="p-5 rounded-3xl bg-[#060913] border border-white/10 space-y-4 shadow-xl">
                   <div className="flex justify-between items-center py-2">
                     <div>
                       <div className="text-white font-bold">{studentName}</div>
-                      <div className="text-slate-400 text-[11px] mt-0.5">{studentEmail} • {rollNo}</div>
+                      <div className="text-slate-400 text-[11px] mt-0.5 font-medium">{studentEmail} • {rollNo}</div>
                     </div>
                     <button onClick={handleLogout} className="px-4 py-2 bg-rose-950/80 border border-rose-800 text-rose-300 rounded-xl font-bold">Sign Out</button>
                   </div>
@@ -1274,7 +1295,7 @@ export default function MBMChatWorkspace() {
           </main>
 
           {/* Right Sidebar Quick Actions */}
-          <aside className="hidden md:block md:col-span-3 border-l border-white/10 p-4 space-y-4 font-mono text-xs">
+          <aside className="hidden md:block md:col-span-3 border-l border-white/10 p-4 space-y-4 text-xs font-semibold">
             <div className="p-4 rounded-3xl bg-[#060913] border border-white/10 space-y-3 shadow-xl">
               <span className="text-[10px] font-bold text-pink-400 uppercase tracking-wider block">Campus Shortcuts</span>
               <button onClick={() => setActiveTab('feed')} className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition">
@@ -1285,19 +1306,75 @@ export default function MBMChatWorkspace() {
                 <ShoppingBag className="w-4 h-4 text-emerald-400" />
                 <span>Sell Item</span>
               </button>
-              <button onClick={() => { snapFileInputRef.current?.click(); }} className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition">
+              <button onClick={() => startCamera('environment')} className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition">
                 <Camera className="w-4 h-4 text-amber-400" />
                 <span>Capture Snap</span>
               </button>
-              <input type="file" accept="image/*" capture="environment" ref={snapFileInputRef} onChange={handleSnapFileSelected} className="hidden" />
             </div>
           </aside>
 
         </div>
       </div>
 
-      {/* Mobile Fixed Bottom Navigation Bar (Gen-Z Vibe) */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-[#060913]/95 backdrop-blur-2xl border-t border-white/10 px-4 flex items-center justify-around z-50 shadow-2xl">
+      {/* Real-time Live Camera Stream Modal */}
+      {isCameraOpen && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between p-4 font-sans">
+          <div className="flex items-center justify-between z-10 pt-2">
+            <button onClick={stopCamera} className="p-3 rounded-full bg-black/60 text-white border border-white/20">
+              <X className="w-5 h-5" />
+            </button>
+            <span className="text-xs text-amber-400 font-bold px-4 py-1.5 bg-black/60 rounded-full border border-white/20">
+              {cameraFacingMode === 'environment' ? 'BACK CAMERA' : 'FRONT CAMERA'}
+            </span>
+            <button onClick={toggleCameraFacingMode} className="p-3 rounded-full bg-black/60 text-white border border-white/20">
+              <SwitchCamera className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 my-4 rounded-3xl overflow-hidden bg-[#060913] relative flex items-center justify-center border border-white/20 shadow-2xl">
+            {capturedSnapUrl ? (
+              <img src={capturedSnapUrl} alt="Captured" className="w-full h-full object-cover" />
+            ) : (
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted 
+                className={`w-full h-full object-cover ${cameraFacingMode === 'user' ? 'transform -scale-x-100' : ''}`} 
+              />
+            )}
+          </div>
+
+          <div className="flex flex-col items-center gap-3 pb-4">
+            {capturedSnapUrl ? (
+              <div className="w-full max-w-sm space-y-3">
+                <input 
+                  type="text" 
+                  value={snapCaption}
+                  onChange={e => setSnapCaption(e.target.value)}
+                  placeholder="Add a caption..." 
+                  className="w-full bg-black/70 border border-white/20 rounded-xl px-4 py-3 text-white text-xs outline-none font-sans"
+                />
+                <div className="flex gap-3">
+                  <button onClick={() => { setCapturedSnapUrl(null); startCamera(cameraFacingMode); }} className="flex-1 py-3 bg-white/10 text-white rounded-xl text-xs font-bold">
+                    Retake
+                  </button>
+                  <button onClick={broadcastPublicSnap} className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-black font-extrabold rounded-xl text-xs shadow-lg">
+                    Post to Wall
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={capturePhoto} className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center p-1.5 bg-white/20 active:scale-95 transition shadow-2xl">
+                <div className="w-14 h-14 rounded-full bg-white"></div>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Fixed Bottom Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-[#060913]/95 backdrop-blur-2xl border-t border-white/10 px-4 flex items-center justify-around z-40 shadow-2xl font-semibold">
         {[
           { id: 'home', icon: Home, label: 'Home' },
           { id: 'feed', icon: MessageCircle, label: 'Feed' },
@@ -1313,7 +1390,7 @@ export default function MBMChatWorkspace() {
             }`}
           >
             <tab.icon className="w-5 h-5" />
-            <span className="text-[10px] font-mono mt-0.5">{tab.label}</span>
+            <span className="text-[10px] mt-0.5">{tab.label}</span>
             {tab.badge !== undefined && tab.badge > 0 && (
               <span className="absolute top-0 right-2 w-3.5 h-3.5 bg-pink-600 text-white rounded-full text-[8px] font-bold flex items-center justify-center">
                 {tab.badge}
@@ -1324,7 +1401,7 @@ export default function MBMChatWorkspace() {
       </nav>
 
       {/* Footer on Main Dashboard */}
-      <footer className="w-full py-4 text-center font-mono text-[11px] text-slate-500 border-t border-white/5 space-y-1 mb-16 md:mb-0">
+      <footer className="w-full py-4 text-center text-[11px] text-slate-500 border-t border-white/5 space-y-1 mb-16 md:mb-0 font-medium">
         <p>© 2026 MBM Students only. All rights reserved. T&C Applied.</p>
         <p className="text-pink-400 font-bold">Developed by Vineet Kaler</p>
       </footer>
@@ -1334,7 +1411,7 @@ export default function MBMChatWorkspace() {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
           <div className="max-w-md w-full rounded-3xl bg-[#060913] border border-white/10 p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold font-mono text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <UserPlus className="w-4 h-4 text-pink-400" />
                 <span>Registered MBM Students Directory</span>
               </h3>
@@ -1343,9 +1420,9 @@ export default function MBMChatWorkspace() {
               </button>
             </div>
 
-            <p className="text-xs font-mono text-slate-400">Select a registered student to send friend request:</p>
+            <p className="text-xs text-slate-400 font-medium">Select a registered student to send friend request:</p>
 
-            <div className="max-h-60 overflow-y-auto space-y-2 font-mono text-xs">
+            <div className="max-h-60 overflow-y-auto space-y-2 text-xs font-semibold">
               {allRegisteredUsers.length === 0 ? (
                 <p className="text-slate-500 text-center py-6">No other registered students found.</p>
               ) : (
@@ -1353,7 +1430,7 @@ export default function MBMChatWorkspace() {
                   <div key={user.id} className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
                     <div>
                       <div className="font-bold text-white">{user.full_name || user.name || 'Student'}</div>
-                      <div className="text-[10px] text-pink-400">{user.branch} • {user.year}</div>
+                      <div className="text-[10px] text-pink-400 font-medium">{user.branch} • {user.year}</div>
                     </div>
                     <button onClick={() => handleSendFriendRequest(user)} className="px-3.5 py-1.5 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl text-[10px] font-bold shadow">
                       Send Request
@@ -1371,7 +1448,7 @@ export default function MBMChatWorkspace() {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
           <div className="max-w-md w-full rounded-3xl bg-[#060913] border border-white/10 p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold font-mono text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <ShoppingBag className="w-4 h-4 text-emerald-400" />
                 <span>List an Item for Sale / Exchange</span>
               </h3>
@@ -1380,19 +1457,19 @@ export default function MBMChatWorkspace() {
               </button>
             </div>
 
-            <div className="space-y-3 font-mono text-xs">
+            <div className="space-y-3 text-xs font-semibold">
               <div>
-                <label className="text-slate-400 text-[11px] mb-1 block">Item Title</label>
-                <input type="text" value={marketTitle} onChange={e => setMarketTitle(e.target.value)} placeholder="e.g. Mini Drafter, Casio FX-991EX" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-emerald-500" />
+                <label className="text-slate-400 text-[11px] mb-1 block font-medium">Item Title</label>
+                <input type="text" value={marketTitle} onChange={e => setMarketTitle(e.target.value)} placeholder="e.g. Mini Drafter, Casio FX-991EX" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-emerald-500 font-sans" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-400 text-[11px] mb-1 block">Price</label>
-                  <input type="text" value={marketPrice} onChange={e => setMarketPrice(e.target.value)} placeholder="₹250 or Free" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-emerald-500" />
+                  <label className="text-slate-400 text-[11px] mb-1 block font-medium">Price</label>
+                  <input type="text" value={marketPrice} onChange={e => setMarketPrice(e.target.value)} placeholder="₹250 or Free" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-emerald-500 font-sans" />
                 </div>
                 <div>
-                  <label className="text-slate-400 text-[11px] mb-1 block">Category</label>
-                  <select value={marketCategory} onChange={e => setMarketCategory(e.target.value)} className="w-full bg-[#0a0f1d] border border-white/10 rounded-xl px-2 py-2.5 text-white text-xs outline-none">
+                  <label className="text-slate-400 text-[11px] mb-1 block font-medium">Category</label>
+                  <select value={marketCategory} onChange={e => setMarketCategory(e.target.value)} className="w-full bg-[#0a0f1d] border border-white/10 rounded-xl px-2 py-2.5 text-white text-xs outline-none font-sans">
                     <option value="Drafters & Tools">Drafters & Tools</option>
                     <option value="Calculators">Calculators</option>
                     <option value="Books & Notes">Books & Notes</option>
@@ -1411,16 +1488,16 @@ export default function MBMChatWorkspace() {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
           <div className="max-w-md w-full rounded-3xl bg-[#060913] border border-white/10 p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold font-mono text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-cyan-400" />
                 <span>Post University Event</span>
               </h3>
               <button onClick={() => setShowEventModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
             </div>
-            <div className="space-y-3 font-mono text-xs">
-              <input type="text" value={eventTitle} onChange={e => setEventTitle(e.target.value)} placeholder="Event Title" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none" />
-              <input type="text" value={eventDate} onChange={e => setEventDate(e.target.value)} placeholder="Date & Timing" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none" />
-              <input type="text" value={eventVenue} onChange={e => setEventVenue(e.target.value)} placeholder="Venue" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none" />
+            <div className="space-y-3 text-xs font-semibold">
+              <input type="text" value={eventTitle} onChange={e => setEventTitle(e.target.value)} placeholder="Event Title" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none font-sans" />
+              <input type="text" value={eventDate} onChange={e => setEventDate(e.target.value)} placeholder="Date & Timing" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none font-sans" />
+              <input type="text" value={eventVenue} onChange={e => setEventVenue(e.target.value)} placeholder="Venue" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none font-sans" />
               <button onClick={handleCreateEvent} className="w-full py-3 bg-cyan-600 text-white font-bold rounded-xl mt-2 shadow-lg">Announce Event</button>
             </div>
           </div>
