@@ -6,7 +6,7 @@ import {
   Home, MessageSquare, Camera, Compass, Lock, ShoppingBag, 
   Calendar, Settings, Plus, Send, X, 
   UserPlus, UserMinus, LogOut, ArrowRight, SwitchCamera, User, LogIn,
-  Heart, MessageCircle, CheckCircle2, Flag, Trash2, Bell, Check, ShieldAlert, Sparkles, Flame, Menu
+  Heart, MessageCircle, CheckCircle2, Flag, Trash2, Bell, Check, ShieldAlert, Sparkles, Flame, Menu, Image as ImageIcon
 } from 'lucide-react';
 
 const ADMIN_EMAILS = ['kalervineet4@gmail.com'];
@@ -55,17 +55,13 @@ export default function MBMChatWorkspace() {
 
   // Profile Customization
   const [studentBio, setStudentBio] = useState('Student at MBM University.');
-  const [studentInterests, setStudentInterests] = useState<string[]>(['Campus', 'Engineering']);
   const [savingBio, setSavingBio] = useState(false);
 
-  // Camera & Visual Snaps
-  const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('environment');
+  // Camera & Mobile High-Quality Snap State
   const [capturedSnapUrl, setCapturedSnapUrl] = useState<string | null>(null);
   const [snapCaption, setSnapCaption] = useState('');
   const [publicSnaps, setPublicSnaps] = useState<any[]>([]);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const snapFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Friends, Requests & P2P Chat State
   const [chatPeers, setChatPeers] = useState<any[]>([]);
@@ -76,9 +72,11 @@ export default function MBMChatWorkspace() {
   const [messages, setMessages] = useState<any[]>([]);
   const [chatDraft, setChatDraft] = useState('');
 
-  // Open Posts / Opinions
+  // Open Posts / Opinions with Media Attachment
   const [posts, setPosts] = useState<any[]>([]);
   const [postDraft, setPostDraft] = useState('');
+  const [postMediaUrl, setPostMediaUrl] = useState<string | null>(null);
+  const postMediaInputRef = useRef<HTMLInputElement | null>(null);
 
   // Confessions
   const [confessions, setConfessions] = useState<any[]>([]);
@@ -125,7 +123,6 @@ export default function MBMChatWorkspace() {
           setBranch(profile.branch || MBM_BRANCHES[0]);
           setYear(profile.year || '1st Year');
           if (profile.bio) setStudentBio(profile.bio);
-          if (profile.interests) setStudentInterests(profile.interests);
         }
 
         fetchAppData(userEmail);
@@ -255,6 +252,36 @@ export default function MBMChatWorkspace() {
     return <span className="font-bold text-white">{authorName || 'Student'}</span>;
   };
 
+  // High-Quality Mobile Snap Handler
+  const handleSnapFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setCapturedSnapUrl(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const broadcastPublicSnap = () => {
+    if (!capturedSnapUrl) return;
+    const newSnap = {
+      id: `snap_${Date.now()}`,
+      sender: studentName,
+      branch,
+      year,
+      imageUrl: capturedSnapUrl,
+      caption: snapCaption || 'Campus moment ✨',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      likes: 0
+    };
+    setPublicSnaps(prev => [newSnap, ...prev]);
+    setCapturedSnapUrl(null);
+    setSnapCaption('');
+    setActiveTab('wall');
+  };
+
   // Send Friend Request
   const handleSendFriendRequest = async (targetUser: any) => {
     const targetEmail = targetUser.email;
@@ -334,11 +361,24 @@ export default function MBMChatWorkspace() {
     alert('Report submitted to Admin Desk.');
   };
 
-  // Submit Open Post
+  // Submit Open Post with Media Attachment
+  const handlePostMediaSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPostMediaUrl(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const submitPost = async () => {
-    if (!postDraft.trim()) return;
+    if (!postDraft.trim() && !postMediaUrl) return;
     const content = postDraft.trim();
+    const media = postMediaUrl;
     setPostDraft('');
+    setPostMediaUrl(null);
 
     await supabase.from('posts').insert([
       {
@@ -346,7 +386,21 @@ export default function MBMChatWorkspace() {
         author_email: studentEmail,
         branch,
         year,
-        content,
+        content: media ? `${content}\n[MEDIA:${media}]` : content,
+        likes: 0
+      }
+    ]);
+  };
+
+  // Submit Confession
+  const submitConfession = async () => {
+    if (!confessionDraft.trim()) return;
+    const contentToSend = confessionDraft.trim();
+    setConfessionDraft('');
+    await supabase.from('confessions').insert([
+      {
+        tag: confessionTag,
+        content: contentToSend,
         likes: 0
       }
     ]);
@@ -370,33 +424,6 @@ export default function MBMChatWorkspace() {
   const handleLikePost = async (postId: string, currentLikes: number) => {
     await supabase.from('posts').update({ likes: (currentLikes || 0) + 1 }).eq('id', postId);
     setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes: (p.likes || 0) + 1 } : p));
-  };
-
-  const handleSendComment = async (parentId: string, parentType: 'post' | 'confession') => {
-    const draft = commentDrafts[parentId];
-    if (!draft || !draft.trim()) return;
-
-    await supabase.from('comments').insert([
-      {
-        parent_type: parentType,
-        parent_id: parentId,
-        author_name: parentType === 'confession' ? 'Anonymous Peer' : studentName,
-        author_email: parentType === 'confession' ? null : studentEmail,
-        comment_text: draft.trim()
-      }
-    ]);
-
-    setCommentDrafts(prev => ({ ...prev, [parentId]: '' }));
-  };
-
-  const renderCommentText = (text: string) => {
-    const parts = text.split(/(@\w+)/g);
-    return parts.map((part, idx) => {
-      if (part.startsWith('@')) {
-        return <span key={idx} className="text-pink-400 font-bold bg-pink-950/40 px-1.5 py-0.5 rounded-md">{part}</span>;
-      }
-      return part;
-    });
   };
 
   const handleCreateMarketItem = async () => {
@@ -548,71 +575,6 @@ export default function MBMChatWorkspace() {
     await supabase.auth.signOut();
     setSessionActive(false);
     window.location.reload();
-  };
-
-  const startCamera = async (mode: 'user' | 'environment' = cameraFacingMode) => {
-    stopCamera();
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: false });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setCameraFacingMode(mode);
-      setIsCameraOpen(true);
-    } catch {
-      alert('Camera access denied or device unsupported.');
-    }
-  };
-
-  const toggleCameraFacingMode = () => {
-    startCamera(cameraFacingMode === 'user' ? 'environment' : 'user');
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-    setIsCameraOpen(false);
-  };
-
-  const capturePhoto = () => {
-    if (!videoRef.current) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth || 720;
-    canvas.height = videoRef.current.videoHeight || 1280;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      setCapturedSnapUrl(canvas.toDataURL('image/jpeg', 0.85));
-      stopCamera();
-      setIsCameraOpen(true);
-    }
-  };
-
-  const broadcastPublicSnap = () => {
-    if (!capturedSnapUrl) return;
-    const newSnap = {
-      id: `snap_${Date.now()}`,
-      sender: studentName,
-      branch,
-      year,
-      imageUrl: capturedSnapUrl,
-      caption: snapCaption || 'Campus moment ✨',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      likes: 0
-    };
-    setPublicSnaps(prev => [newSnap, ...prev]);
-    setCapturedSnapUrl(null);
-    setSnapCaption('');
-    setIsCameraOpen(false);
-    setActiveTab('wall');
-  };
-
-  const submitConfession = async () => {
-    if (!confessionDraft.trim()) return;
-    const contentToSend = confessionDraft.trim();
-    setConfessionDraft('');
-    await supabase.from('confessions').insert([{ tag: confessionTag, content: contentToSend, likes: 0 }]);
   };
 
   // Auth Screen (Gen-Z Neon Glow)
@@ -921,13 +883,29 @@ export default function MBMChatWorkspace() {
               </div>
             )}
 
-            {/* TAB: STUDENT OPINIONS */}
+            {/* TAB: STUDENT OPINIONS WITH PHOTO/VIDEO UPLOAD */}
             {activeTab === 'feed' && (
               <div className="space-y-4 font-sans">
                 <div className="p-4 sm:p-5 rounded-3xl bg-[#060913] border border-white/10 space-y-3 shadow-xl">
-                  <span className="text-xs font-mono font-bold text-slate-400">Share Campus Opinion</span>
+                  <span className="text-xs font-mono font-bold text-slate-400">Share Campus Opinion (Text, Photo or Video)</span>
                   <textarea rows={3} value={postDraft} onChange={e => setPostDraft(e.target.value)} placeholder="What's your opinion on college labs, events, or mess?" className="w-full bg-black/50 border border-white/10 rounded-2xl p-3.5 text-xs text-white placeholder-slate-600 outline-none focus:border-pink-500 resize-none transition" />
-                  <div className="flex justify-end">
+                  
+                  {postMediaUrl && (
+                    <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black">
+                      <img src={postMediaUrl} alt="Attached Media" className="w-full h-full object-cover" />
+                      <button onClick={() => setPostMediaUrl(null)} className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 text-white hover:bg-rose-600 transition">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <input type="file" accept="image/*,video/*" ref={postMediaInputRef} onChange={handlePostMediaSelected} className="hidden" />
+                    <button onClick={() => postMediaInputRef.current?.click()} className="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-cyan-400 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 transition">
+                      <ImageIcon className="w-4 h-4" />
+                      <span>Add Photo/Video</span>
+                    </button>
+
                     <button onClick={submitPost} className="px-5 py-2.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 text-white text-xs font-mono font-bold rounded-xl shadow-lg transition flex items-center gap-2">
                       <span>Post Opinion</span>
                       <Send className="w-3.5 h-3.5" />
@@ -939,6 +917,14 @@ export default function MBMChatWorkspace() {
                   {posts.map(post => {
                     const postComments = comments.filter(c => c.parent_id === post.id);
                     const isAuthorOrAdmin = (post.author_email === studentEmail) || ADMIN_EMAILS.includes(studentEmail);
+
+                    let displayContent = post.content || '';
+                    let mediaAttachment = null;
+                    if (displayContent.includes('[MEDIA:')) {
+                      const parts = displayContent.split('[MEDIA:');
+                      displayContent = parts[0];
+                      mediaAttachment = parts[1].replace(']', '');
+                    }
 
                     return (
                       <div key={post.id} className="p-4 sm:p-5 rounded-3xl bg-[#060913] border border-white/10 space-y-3 shadow-xl">
@@ -958,7 +944,17 @@ export default function MBMChatWorkspace() {
                             </button>
                           </div>
                         </div>
-                        <p className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap">{post.content}</p>
+
+                        {displayContent.trim() && (
+                          <p className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+                        )}
+
+                        {mediaAttachment && (
+                          <div className="rounded-2xl overflow-hidden border border-white/10 max-h-80 bg-black">
+                            <img src={mediaAttachment} alt="Post Attachment" className="w-full h-full object-contain" />
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-4 pt-3 border-t border-white/5 text-xs font-mono text-slate-400">
                           <button onClick={() => handleLikePost(post.id, post.likes)} className="flex items-center gap-1.5 hover:text-pink-400 transition">
                             <Heart className={`w-4 h-4 ${post.likes > 0 ? 'text-pink-500 fill-pink-500' : ''}`} />
@@ -1135,11 +1131,26 @@ export default function MBMChatWorkspace() {
               <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-bold font-mono text-white">Campus Wall</h2>
-                  <button onClick={() => startCamera()} className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 text-black text-xs font-mono font-bold rounded-xl flex items-center gap-2 shadow-lg">
+                  <input type="file" accept="image/*" capture="environment" ref={snapFileInputRef} onChange={handleSnapFileSelected} className="hidden" />
+                  <button onClick={() => snapFileInputRef.current?.click()} className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 text-black text-xs font-mono font-bold rounded-xl flex items-center gap-2 shadow-lg">
                     <Camera className="w-3.5 h-3.5" />
                     <span>Take Snap</span>
                   </button>
                 </div>
+
+                {capturedSnapUrl && (
+                  <div className="p-5 rounded-3xl bg-[#060913] border border-white/10 space-y-3 shadow-2xl">
+                    <div className="relative aspect-[3/4] max-h-96 rounded-2xl overflow-hidden bg-black mx-auto">
+                      <img src={capturedSnapUrl} alt="Captured Snap" className="w-full h-full object-contain" />
+                    </div>
+                    <input type="text" value={snapCaption} onChange={e => setSnapCaption(e.target.value)} placeholder="Add a caption to your snap..." className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-3 text-xs text-white outline-none focus:border-amber-500" />
+                    <div className="flex gap-2">
+                      <button onClick={() => setCapturedSnapUrl(null)} className="flex-1 py-2.5 bg-white/5 text-white rounded-xl text-xs font-mono font-bold">Retake</button>
+                      <button onClick={broadcastPublicSnap} className="flex-1 py-2.5 bg-amber-500 text-black rounded-xl text-xs font-mono font-bold shadow">Post to Wall</button>
+                    </div>
+                  </div>
+                )}
+
                 {publicSnaps.length === 0 ? (
                   <div className="p-12 border border-dashed border-white/10 rounded-3xl text-center font-mono text-slate-500 text-xs bg-[#060913]/50">No active snaps on wall. Be the first!</div>
                 ) : (
@@ -1148,9 +1159,13 @@ export default function MBMChatWorkspace() {
                       <div key={snap.id} className="rounded-3xl overflow-hidden bg-[#060913] border border-white/10 space-y-2 shadow-2xl">
                         <div className="relative aspect-[3/4]">
                           <img src={snap.imageUrl} alt="Snap" className="w-full h-full object-cover" />
+                          <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur font-mono text-[10px] text-white">
+                            {snap.sender} • {snap.branch}
+                          </div>
                         </div>
                         <div className="p-3 font-mono text-xs flex justify-between text-slate-300">
                           <span>{snap.caption}</span>
+                          <span className="text-[10px] text-slate-500">{snap.timestamp}</span>
                         </div>
                       </div>
                     ))}
@@ -1175,7 +1190,9 @@ export default function MBMChatWorkspace() {
                         <div>
                           <span className="text-emerald-400 font-mono font-black text-sm">{item.price}</span>
                           <h4 className="text-white font-bold text-sm mt-2">{item.title}</h4>
+                          <div className="text-[11px] text-slate-400 font-mono mt-1">Seller: {item.seller}</div>
                         </div>
+                        <div className="text-[11px] font-mono text-cyan-400 pt-2 border-t border-white/5">📞 {item.contact || 'Chat in App'}</div>
                       </div>
                     ))}
                   </div>
@@ -1195,8 +1212,14 @@ export default function MBMChatWorkspace() {
                 ) : (
                   <div className="space-y-3">
                     {eventsList.map(ev => (
-                      <div key={ev.id} className="p-4 rounded-2xl bg-[#060913] border border-white/10 flex justify-between shadow-xl">
-                        <h4 className="text-white font-bold text-sm">{ev.title}</h4>
+                      <div key={ev.id} className="p-4 rounded-2xl bg-[#060913] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
+                        <div className="space-y-1">
+                          <h4 className="text-white font-bold text-sm">{ev.title}</h4>
+                          <div className="text-[11px] font-mono text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
+                            <span>📅 {ev.date}</span>
+                            <span>📍 {ev.venue}</span>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1262,10 +1285,11 @@ export default function MBMChatWorkspace() {
                 <ShoppingBag className="w-4 h-4 text-emerald-400" />
                 <span>Sell Item</span>
               </button>
-              <button onClick={() => startCamera()} className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition">
+              <button onClick={() => { snapFileInputRef.current?.click(); }} className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition">
                 <Camera className="w-4 h-4 text-amber-400" />
                 <span>Capture Snap</span>
               </button>
+              <input type="file" accept="image/*" capture="environment" ref={snapFileInputRef} onChange={handleSnapFileSelected} className="hidden" />
             </div>
           </aside>
 
@@ -1399,29 +1423,6 @@ export default function MBMChatWorkspace() {
               <input type="text" value={eventVenue} onChange={e => setEventVenue(e.target.value)} placeholder="Venue" className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-white outline-none" />
               <button onClick={handleCreateEvent} className="w-full py-3 bg-cyan-600 text-white font-bold rounded-xl mt-2 shadow-lg">Announce Event</button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Camera Live Modal */}
-      {isCameraOpen && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between p-4 font-sans">
-          <div className="flex items-center justify-between z-10">
-            <button onClick={stopCamera} className="p-2.5 rounded-full bg-black/60 text-white"><X className="w-5 h-5" /></button>
-            <button onClick={toggleCameraFacingMode} className="p-2.5 rounded-full bg-black/60 text-white"><SwitchCamera className="w-5 h-5" /></button>
-          </div>
-          <div className="flex-1 my-4 rounded-3xl overflow-hidden bg-[#060913] relative flex items-center justify-center border border-white/10 shadow-2xl">
-            {capturedSnapUrl ? <img src={capturedSnapUrl} alt="Snap" className="w-full h-full object-cover" /> : <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />}
-          </div>
-          <div className="flex flex-col items-center gap-3 py-2 font-mono text-xs">
-            {capturedSnapUrl ? (
-              <div className="w-full max-w-sm space-y-3">
-                <input type="text" value={snapCaption} onChange={e => setSnapCaption(e.target.value)} placeholder="Caption..." className="w-full bg-black/60 border border-white/20 rounded-xl px-3.5 py-2.5 text-white outline-none" />
-                <button onClick={broadcastPublicSnap} className="w-full py-3 bg-amber-500 text-black font-bold rounded-xl shadow-lg">Post to Wall</button>
-              </div>
-            ) : (
-              <button onClick={capturePhoto} className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center p-1 bg-white/20 active:scale-95 transition"><div className="w-12 h-12 rounded-full bg-white"></div></button>
-            )}
           </div>
         </div>
       )}
