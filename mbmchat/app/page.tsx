@@ -73,7 +73,7 @@ export default function MBMChatWorkspace() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authStep, setAuthStep] = useState<'details' | 'otp'>('details');
   const [authLoading, setAuthLoading] = useState(false);
-  
+   
   // Registration & Login Fields
   const [studentEmail, setStudentEmail] = useState('');
   const [studentPassword, setStudentPassword] = useState('');
@@ -249,7 +249,6 @@ export default function MBMChatWorkspace() {
     if (data) setEventsList(data);
   };
 
-  // Save Bio & Profile Permanently in DB
   const handleSaveBio = async () => {
     setSavingBio(true);
     const { data: { session } } = await supabase.auth.getSession();
@@ -267,7 +266,6 @@ export default function MBMChatWorkspace() {
     setSavingBio(false);
   };
 
-  // Helper: Name with Admin Verification Badge
   const renderAuthorName = (authorName: string, authorEmail?: string) => {
     const isAdmin = (authorEmail && ADMIN_EMAILS.includes(authorEmail)) || authorName?.includes('Vineet Kaler');
     if (isAdmin) {
@@ -300,13 +298,12 @@ export default function MBMChatWorkspace() {
     setActiveTab('wall');
   };
 
-  // Send Friend Request
   const handleSendFriendRequest = async (targetUser: any) => {
     const targetEmail = targetUser.email;
     const targetName = targetUser.full_name || targetUser.name || 'Student';
 
     if (targetEmail === studentEmail) {
-      alert('Aap khud ko friend request nahi bhej sakte.');
+      alert('You cannot send a friend request to yourself.');
       return;
     }
 
@@ -328,7 +325,6 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Accept Friend Request
   const handleAcceptRequest = async (reqId: string) => {
     const { error } = await supabase.from('friend_requests').update({ status: 'accepted' }).eq('id', reqId);
     if (!error) {
@@ -347,7 +343,6 @@ export default function MBMChatWorkspace() {
     if (selectedPeer?.email === friendEmail) setSelectedPeer(null);
   };
 
-  // Send P2P Message
   const sendP2PMessage = async () => {
     if (!chatDraft.trim() || !selectedPeer) return;
     const textToSend = chatDraft.trim();
@@ -363,7 +358,6 @@ export default function MBMChatWorkspace() {
     ]);
   };
 
-  // Report Content or User
   const handleReport = async (contentType: 'post' | 'confession' | 'snap' | 'market' | 'event' | 'user', targetId: string) => {
     const reason = prompt(`Report this ${contentType}? Please provide reason:`);
     if (!reason || !reason.trim()) return;
@@ -379,7 +373,6 @@ export default function MBMChatWorkspace() {
     alert('Report submitted to Admin Desk.');
   };
 
-  // Submit Open Post with Media Attachment
   const handlePostMediaSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -410,7 +403,6 @@ export default function MBMChatWorkspace() {
     ]);
   };
 
-  // Submit Confession
   const submitConfession = async () => {
     if (!confessionDraft.trim()) return;
     const contentToSend = confessionDraft.trim();
@@ -424,7 +416,6 @@ export default function MBMChatWorkspace() {
     ]);
   };
 
-  // Delete Own Post
   const handleDeletePost = async (postId: string, authorEmail: string) => {
     const isAdmin = ADMIN_EMAILS.includes(studentEmail);
     const isOwner = studentEmail === authorEmail;
@@ -493,7 +484,6 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Authentication - Login
   const handlePasswordLogin = async () => {
     if (!studentEmail.trim() || !studentPassword.trim()) {
       alert('Please enter your email and password.');
@@ -514,7 +504,6 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Secure OTP Step 1
   const handleSendRegistrationOtp = async () => {
     if (!studentEmail.trim() || !studentPassword.trim() || !studentName.trim() || !rollNo.trim()) {
       alert('All registration fields are mandatory.');
@@ -546,7 +535,6 @@ export default function MBMChatWorkspace() {
     }
   };
 
-  // Secure OTP Step 2
   const handleVerifyOtp = async () => {
     if (!otpCode.trim()) {
       alert('Please enter the 6-digit OTP.');
@@ -595,7 +583,6 @@ export default function MBMChatWorkspace() {
     window.location.reload();
   };
 
-  // Auth Screen
   if (!sessionActive) {
     return (
       <div className="mbm min-h-screen flex flex-col font-sans selection:bg-[var(--electric)] selection:text-white">
@@ -608,15 +595,15 @@ export default function MBMChatWorkspace() {
               <span className="brand text-[22px]">MBMChat</span>
             </div>
             <h1 className="text-[46px] sm:text-[68px] leading-[0.96]">
-              Lecture miss karo.<br />Gossip nahi.
+              MBM University<br />Student Network
             </h1>
             <p className="text-[17px] max-w-md text-[var(--mute)] leading-relaxed">
-              MBM ke students ke liye confessions, chats, snaps aur bazaar. Professor ko pata na chale, bas itna dhyan rakhna.
+              Secure P2P student communications, campus discussions, announcements, and university networking platform.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
-              <span className="sticker nb-sun" style={{ '--r': '-3deg' } as React.CSSProperties}>Attendance yahan nahi lagti</span>
-              <span className="sticker nb-pink" style={{ '--r': '2deg' } as React.CSSProperties}>Sirf verified MBM students. Fake ID wale, rasta naapo.</span>
-              <span className="sticker nb-mint" style={{ '--r': '-1.5deg' } as React.CSSProperties}>*T&C: koi nahi padhta</span>
+              <span className="sticker nb-sun" style={{ '--r': '-3deg' } as React.CSSProperties}>Secure Authentication</span>
+              <span className="sticker nb-pink" style={{ '--r': '2deg' } as React.CSSProperties}>Verified MBM Students Only</span>
+              <span className="sticker nb-mint" style={{ '--r': '-1.5deg' } as React.CSSProperties}>Real-time Collaboration</span>
             </div>
           </section>
 
@@ -628,23 +615,23 @@ export default function MBMChatWorkspace() {
                   className={`nb-btn py-2.5 text-[14px] flex items-center justify-center gap-2 ${authMode === 'login' ? 'nb-electric' : 'bg-white text-[var(--ink)]'}`}
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>Pehle se ho</span>
+                  <span>Sign In</span>
                 </button>
                 <button
                   onClick={() => { setAuthMode('register'); setAuthStep('details'); }}
                   className={`nb-btn py-2.5 text-[14px] flex items-center justify-center gap-2 ${authMode === 'register' ? 'nb-electric' : 'bg-white text-[var(--ink)]'}`}
                 >
                   <UserPlus className="w-4 h-4" />
-                  <span>Naye ho</span>
+                  <span>Register</span>
                 </button>
               </div>
 
               <div>
                 <h2 className="text-[27px] leading-tight">
-                  {authMode === 'login' ? 'Wapas aa gaye?' : authStep === 'otp' ? 'Inbox check karo.' : 'Naya account, purani aadatein.'}
+                  {authMode === 'login' ? 'Welcome Back' : authStep === 'otp' ? 'Verification Code' : 'Student Registration'}
                 </h2>
                 <p className="text-[14px] text-[var(--mute)] mt-1">
-                  {authMode === 'login' ? 'Chalo, andar aao. Kisi ne roka nahi.' : authStep === 'otp' ? 'Spam folder bhi dekh lena, wahi sab kuch jaata hai.' : 'Saare fields zaroori hain. Haan, saare ke saare.'}
+                  {authMode === 'login' ? 'Enter your credentials to access your account.' : authStep === 'otp' ? 'Please check your email inbox or spam folder.' : 'Please fill in your valid academic details.'}
                 </p>
               </div>
 
@@ -652,22 +639,22 @@ export default function MBMChatWorkspace() {
                 {authMode === 'register' && authStep === 'details' && (
                   <>
                     <div>
-                      <label className="nb-label">Naam (asli wala)</label>
-                      <input type="text" value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="Jo marksheet pe likha hai" className="nb-input w-full px-3.5 py-3 text-[15px]" />
+                      <label className="nb-label">Full Name</label>
+                      <input type="text" value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="Enter your full name" className="nb-input w-full px-3.5 py-3 text-[15px]" />
                     </div>
                     <div>
-                      <label className="nb-label">Roll number (proxy nahi chalega)</label>
+                      <label className="nb-label">Roll Number</label>
                       <input type="text" value={rollNo} onChange={e => setRollNo(e.target.value)} placeholder="e.g. 23UFIEXXXX" className="nb-input w-full px-3.5 py-3 text-[15px]" />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="nb-label">Branch (jo mili wahi)</label>
+                        <label className="nb-label">Department / Branch</label>
                         <select value={branch} onChange={e => setBranch(e.target.value)} className="nb-input w-full px-3 py-3 text-[14px]">
                           {MBM_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="nb-label">Kaunsa saal chal raha hai</label>
+                        <label className="nb-label">Academic Year</label>
                         <select value={year} onChange={e => setYear(e.target.value)} className="nb-input w-full px-3 py-3 text-[14px]">
                           <option value="1st Year">1st Year</option>
                           <option value="2nd Year">2nd Year</option>
@@ -677,15 +664,15 @@ export default function MBMChatWorkspace() {
                       </div>
                     </div>
                     <div>
-                      <label className="nb-label">Email</label>
+                      <label className="nb-label">Email Address</label>
                       <input type="email" value={studentEmail} onChange={e => setStudentEmail(e.target.value)} placeholder="student@example.com" className="nb-input w-full px-3.5 py-3 text-[15px]" />
                     </div>
                     <div>
-                      <label className="nb-label">Password (123456 mat rakhna)</label>
+                      <label className="nb-label">Password</label>
                       <input type="password" value={studentPassword} onChange={e => setStudentPassword(e.target.value)} placeholder="••••••••" className="nb-input w-full px-3.5 py-3 text-[15px]" />
                     </div>
                     <button onClick={handleSendRegistrationOtp} disabled={authLoading} className="nb-btn nb-electric w-full py-3.5 mt-1 text-[15px] flex items-center justify-center gap-2">
-                      <span>{authLoading ? 'Bhej rahe hain, saans lo...' : 'OTP bhejo, drama baad me'}</span>
+                      <span>{authLoading ? 'Sending Verification Code...' : 'Send Verification OTP'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </>
@@ -694,18 +681,18 @@ export default function MBMChatWorkspace() {
                 {authMode === 'register' && authStep === 'otp' && (
                   <div className="space-y-4">
                     <div className="nb-sun rounded-[12px] p-4 text-center">
-                      <p className="text-[13px]">Code is email pe gaya hai:</p>
+                      <p className="text-[13px]">Verification code sent to:</p>
                       <p className="font-bold text-[15px] break-all">{studentEmail}</p>
                     </div>
                     <div>
-                      <label className="nb-label text-center">6 digit ka code daalo</label>
+                      <label className="nb-label text-center">Enter 6-Digit OTP Code</label>
                       <input type="text" maxLength={8} value={otpCode} onChange={e => setOtpCode(e.target.value)} placeholder="••••••" className="nb-input w-full px-4 py-3.5 text-center tracking-[0.5em] text-[26px] font-bold" />
                     </div>
                     <button onClick={handleVerifyOtp} disabled={authLoading} className="nb-btn nb-mint w-full py-3.5 text-[15px] flex items-center justify-center gap-2">
-                      <span>{authLoading ? 'Check kar rahe hain...' : 'Verify karo aur andar aao'}</span>
+                      <span>{authLoading ? 'Verifying...' : 'Verify & Enter Platform'}</span>
                     </button>
                     <button onClick={() => setAuthStep('details')} className="w-full text-center text-[13px] text-[var(--mute)] hover:text-[var(--ink)] underline underline-offset-4 pt-1">
-                      Galat email? Wapas jao
+                      Incorrect email? Go back
                     </button>
                   </div>
                 )}
@@ -713,7 +700,7 @@ export default function MBMChatWorkspace() {
                 {authMode === 'login' && (
                   <>
                     <div>
-                      <label className="nb-label">Email</label>
+                      <label className="nb-label">Email Address</label>
                       <input type="email" value={studentEmail} onChange={e => setStudentEmail(e.target.value)} placeholder="student@example.com" className="nb-input w-full px-3.5 py-3 text-[15px]" />
                     </div>
                     <div>
@@ -721,7 +708,7 @@ export default function MBMChatWorkspace() {
                       <input type="password" value={studentPassword} onChange={e => setStudentPassword(e.target.value)} placeholder="••••••••" className="nb-input w-full px-3.5 py-3 text-[15px]" />
                     </div>
                     <button onClick={handlePasswordLogin} disabled={authLoading} className="nb-btn nb-electric w-full py-3.5 mt-1 text-[15px] flex items-center justify-center gap-2">
-                      <span>{authLoading ? 'Dhundh rahe hain tumhe...' : 'Andar aao'}</span>
+                      <span>{authLoading ? 'Authenticating...' : 'Sign In'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </>
@@ -784,22 +771,22 @@ export default function MBMChatWorkspace() {
         {mobileMenuOpen && (
           <div className="md:hidden fixed inset-x-0 top-16 bg-white backdrop-blur-2xl border-b-2 border-[var(--ink)] p-4 z-40 space-y-1 text-[14px] font-semibold">
             {[
-              { id: 'home', label: 'Home', icon: Home },
-              { id: 'feed', label: 'Gyaan (bina maange)', icon: MessageCircle },
+              { id: 'home', label: 'Dashboard', icon: Home },
+              { id: 'feed', label: 'Discussions', icon: MessageCircle },
               { id: 'confessions', label: 'Confessions', icon: Lock },
               { id: 'chats', label: 'Chats', icon: MessageSquare, badge: chatPeers.length },
-              { id: 'notifications', label: 'Friend requests', icon: Bell, badge: friendRequests.length },
-              { id: 'wall', label: 'Campus wall', icon: Camera },
-              { id: 'market', label: 'Bazaar', icon: ShoppingBag, badge: marketItems.length },
-              { id: 'events', label: 'Events (free food?)', icon: Calendar, badge: eventsList.length },
+              { id: 'notifications', label: 'Friend Requests', icon: Bell, badge: friendRequests.length },
+              { id: 'wall', label: 'Campus Wall', icon: Camera },
+              { id: 'market', label: 'Marketplace', icon: ShoppingBag, badge: marketItems.length },
+              { id: 'events', label: 'Events Hub', icon: Calendar, badge: eventsList.length },
               { id: 'settings', label: 'Settings', icon: Settings },
             ].map(item => (
               <button
                 key={item.id}
                 onClick={() => { setActiveTab(item.id as any); setMobileMenuOpen(false); }}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-[10px] transition ${
- activeTab === item.id ? 'nb-sun font-bold' : 'text-[var(--ink)] border-2 border-transparent hover:bg-white hover:border-[var(--ink)]'
- }`}
+                 activeTab === item.id ? 'nb-sun font-bold' : 'text-[var(--ink)] border-2 border-transparent hover:bg-white hover:border-[var(--ink)]'
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <item.icon className="w-4 h-4" />
@@ -821,26 +808,26 @@ export default function MBMChatWorkspace() {
           {/* Desktop Navigation Sidebar */}
           <aside className="hidden md:flex md:col-span-3 border-r-2 border-[var(--ink)] p-4 flex-col justify-between text-[14px] font-semibold">
             <div className="space-y-1.5">
-              <div className="text-[12px] text-[var(--mute)] px-3 py-1 font-bold">Kahan jaana hai?</div>
+              <div className="text-[12px] text-[var(--mute)] px-3 py-1 font-bold">Main Menu</div>
               {[
-                { id: 'home', label: 'Home', icon: Home },
-                { id: 'feed', label: 'Gyaan (bina maange)', icon: MessageCircle },
+                { id: 'home', label: 'Dashboard', icon: Home },
+                { id: 'feed', label: 'Discussions', icon: MessageCircle },
                 { id: 'confessions', label: 'Confessions', icon: Lock },
                 { id: 'chats', label: 'Chats', icon: MessageSquare, badge: chatPeers.length },
-                { id: 'notifications', label: 'Friend requests', icon: Bell, badge: friendRequests.length },
-                { id: 'wall', label: 'Campus wall', icon: Camera },
-                { id: 'market', label: 'Bazaar', icon: ShoppingBag, badge: marketItems.length },
-                { id: 'events', label: 'Events (free food?)', icon: Calendar, badge: eventsList.length },
+                { id: 'notifications', label: 'Friend Requests', icon: Bell, badge: friendRequests.length },
+                { id: 'wall', label: 'Campus Wall', icon: Camera },
+                { id: 'market', label: 'Marketplace', icon: ShoppingBag, badge: marketItems.length },
+                { id: 'events', label: 'Events Hub', icon: Calendar, badge: eventsList.length },
                 { id: 'settings', label: 'Settings', icon: Settings },
               ].map(item => (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id as any)}
                   className={`w-full flex items-center justify-between px-3.5 py-3 rounded-[12px] transition ${
- activeTab === item.id 
- ? 'nb-sun font-bold' 
- : 'text-[var(--mute)] border-2 border-transparent hover:bg-white hover:border-[var(--ink)] hover:text-[var(--ink)]'
- }`}
+                 activeTab === item.id 
+                 ? 'nb-sun font-bold' 
+                 : 'text-[var(--mute)] border-2 border-transparent hover:bg-white hover:border-[var(--ink)] hover:text-[var(--ink)]'
+                }`}
                 >
                   <div className="flex items-center gap-3">
                     <item.icon className="w-4 h-4" />
@@ -889,10 +876,10 @@ export default function MBMChatWorkspace() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center text-[14px] font-semibold">
                   {[
-                    { label: "Gyaan do", icon: MessageCircle, color: "text-[var(--electric)]", bg: "bg-[#DCD8FF]", act: () => setActiveTab('feed') },
-                    { label: "Raaz kholo", icon: Lock, color: "text-[var(--electric)]", bg: "bg-[#FFD3E8]", act: () => setActiveTab('confessions') },
-                    { label: "Kuch becho", icon: ShoppingBag, color: "text-[#0E7C5A]", bg: "bg-[#C6F4E0]", act: () => setActiveTab('market') },
-                    { label: "Free food?", icon: Calendar, color: "text-[var(--electric)]", bg: "bg-[#FFE9A0]", act: () => setActiveTab('events') },
+                    { label: "Discussions", icon: MessageCircle, color: "text-[var(--electric)]", bg: "bg-[#DCD8FF]", act: () => setActiveTab('feed') },
+                    { label: "Confessions", icon: Lock, color: "text-[var(--electric)]", bg: "bg-[#FFD3E8]", act: () => setActiveTab('confessions') },
+                    { label: "Marketplace", icon: ShoppingBag, color: "text-[#0E7C5A]", bg: "bg-[#C6F4E0]", act: () => setActiveTab('market') },
+                    { label: "Events", icon: Calendar, color: "text-[var(--electric)]", bg: "bg-[#FFE9A0]", act: () => setActiveTab('events') },
                   ].map((a, i) => (
                     <button key={i} onClick={a.act} className={`p-4 rounded-[12px] nb-card nb-lift ${a.bg} flex flex-col items-center gap-2`}>
                       <div className="p-2.5 rounded-lg bg-white border-2 border-[var(--ink)] nb-card">
@@ -904,7 +891,7 @@ export default function MBMChatWorkspace() {
                 </div>
 
                 <div className="p-5 rounded-[16px] bg-white border-2 border-[var(--ink)] space-y-3 text-[14px] font-medium nb-card">
-                  <div className="text-[13px] text-[var(--mute)] font-bold">Campus bio</div>
+                  <div className="text-[13px] text-[var(--mute)] font-bold">Campus Bio</div>
                   <p className="text-[var(--ink)] text-[16px] italic">"{studentBio}"</p>
                 </div>
               </div>
@@ -914,8 +901,8 @@ export default function MBMChatWorkspace() {
             {activeTab === 'feed' && (
               <div className="space-y-4">
                 <div className="p-4 sm:p-5 rounded-[16px] bg-white border-2 border-[var(--ink)] space-y-3 nb-card">
-                  <span className="text-[14px] font-bold text-[var(--mute)]">Duniya ko tumhari raay ki bohot zaroorat hai</span>
-                  <textarea rows={3} value={postDraft} onChange={e => setPostDraft(e.target.value)} placeholder="Mess ke khaane pe kuch kehna hai? Yahin keh do." className="w-full bg-white border-2 border-[var(--ink)] rounded-[12px] p-3.5 text-[14px] text-[var(--ink)] placeholder-[#8C86A3] outline-none focus:border-[var(--ink)] resize-none transition font-sans nb-input" />
+                  <span className="text-[14px] font-bold text-[var(--mute)]">Share campus opinions & announcements</span>
+                  <textarea rows={3} value={postDraft} onChange={e => setPostDraft(e.target.value)} placeholder="Share updates regarding campus labs, events, or general discussions..." className="w-full bg-white border-2 border-[var(--ink)] rounded-[12px] p-3.5 text-[14px] text-[var(--ink)] placeholder-[#8C86A3] outline-none focus:border-[var(--ink)] resize-none transition font-sans nb-input" />
                   
                   {postMediaUrl && (
                     <div className="relative aspect-video rounded-[12px] overflow-hidden border-2 border-[var(--ink)] bg-black">
@@ -930,11 +917,11 @@ export default function MBMChatWorkspace() {
                     <input type="file" accept="image/*,video/*" ref={postMediaInputRef} onChange={handlePostMediaSelected} className="hidden" />
                     <button onClick={() => postMediaInputRef.current?.click()} className="px-3.5 py-2 bg-[var(--paper)] nb-ghost hover:bg-[var(--sun)] text-[var(--electric)] text-[14px] font-semibold rounded-[10px] flex items-center gap-1.5 transition">
                       <ImageIcon className="w-4 h-4" />
-                      <span>Photo / video lagao</span>
+                      <span>Attach Media</span>
                     </button>
 
                     <button onClick={submitPost} className="px-5 py-2.5 nb-electric hover:opacity-90 text-[var(--ink)] text-[14px] font-bold rounded-[10px] transition flex items-center gap-2">
-                      <span>Post kar do</span>
+                      <span>Publish Post</span>
                       <Send className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -1007,13 +994,13 @@ export default function MBMChatWorkspace() {
                     <Lock className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-[16px] font-bold text-[var(--ink)]">Confessions</h3>
-                    <p className="text-[14px] text-[var(--mute)] mt-0.5 font-medium">Anonymous hai. Bas kisi ko batana mat.</p>
+                    <h3 className="text-[16px] font-bold text-[var(--ink)]">Campus Confessions</h3>
+                    <p className="text-[14px] text-[var(--mute)] mt-0.5 font-medium">100% anonymous student stories and thoughts.</p>
                   </div>
                 </div>
 
                 <div className="p-4 sm:p-5 rounded-[16px] bg-white border-2 border-[var(--ink)] space-y-3 nb-card">
-                  <textarea rows={2} value={confessionDraft} onChange={e => setConfessionDraft(e.target.value)} placeholder="Dil ka bojh yahin utaaro..." className="w-full bg-white border-2 border-[var(--ink)] rounded-[12px] p-3.5 text-[14px] text-[var(--ink)] placeholder-[#8C86A3] outline-none focus:border-[var(--ink)] resize-none transition font-sans nb-input" />
+                  <textarea rows={2} value={confessionDraft} onChange={e => setConfessionDraft(e.target.value)} placeholder="Write an anonymous confession..." className="w-full bg-white border-2 border-[var(--ink)] rounded-[12px] p-3.5 text-[14px] text-[var(--ink)] placeholder-[#8C86A3] outline-none focus:border-[var(--ink)] resize-none transition font-sans nb-input" />
                   <div className="flex items-center justify-between">
                     <select value={confessionTag} onChange={e => setConfessionTag(e.target.value)} className="bg-white border-2 border-[var(--ink)] rounded-[10px] text-[14px] font-semibold text-[var(--electric)] px-3 py-2 outline-none nb-input">
                       <option value="General">General</option>
@@ -1022,7 +1009,7 @@ export default function MBMChatWorkspace() {
                       <option value="Crush">Crush</option>
                     </select>
                     <button onClick={submitConfession} className="px-4 py-2 nb-electric text-[var(--ink)] text-[14px] font-bold rounded-[10px] transition">
-                      Chupke se post karo
+                      Post Anonymously
                     </button>
                   </div>
                 </div>
@@ -1043,20 +1030,20 @@ export default function MBMChatWorkspace() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-[24px] leading-tight font-bold text-[var(--ink)]">Chats</h2>
-                    <p className="text-[14px] text-[var(--mute)] font-medium">Dost ho to baat karo.</p>
+                    <h2 className="text-[24px] leading-tight font-bold text-[var(--ink)]">Peer Chats</h2>
+                    <p className="text-[14px] text-[var(--mute)] font-medium">Secure messaging with connected classmates.</p>
                   </div>
                   <button onClick={() => setShowAddFriendModal(true)} className="px-4 py-2 nb-electric hover:opacity-90 text-[var(--ink)] text-[14px] font-bold rounded-[10px] flex items-center gap-2">
                     <UserPlus className="w-3.5 h-3.5" />
-                    <span>Dost dhundo</span>
+                    <span>Add Friends</span>
                   </button>
                 </div>
 
                 {chatPeers.length === 0 ? (
                   <div className="p-12 border-2 border-dashed border-[var(--ink)] rounded-[16px] text-center space-y-2 bg-white/60">
                     <MessageSquare className="w-10 h-10 text-[var(--mute)] mx-auto mb-1" />
-                    <h4 className="text-[16px] font-bold text-[var(--ink)]">Abhi tak koi dost nahi. Koi baat nahi.</h4>
-                    <p className="text-[14px] text-[var(--mute)]">Pehle friend request bhejo. Accept hone ke baad hi chat khulegi.</p>
+                    <h4 className="text-[16px] font-bold text-[var(--ink)]">No active chat connections</h4>
+                    <p className="text-[14px] text-[var(--mute)]">Send friend requests via "Add Friends". Chat unlocks once accepted.</p>
                   </div>
                 ) : selectedPeer ? (
                   <div className="h-[70vh] rounded-[16px] bg-white border-2 border-[var(--ink)] flex flex-col justify-between overflow-hidden nb-card">
@@ -1109,7 +1096,7 @@ export default function MBMChatWorkspace() {
                           </div>
                           <div>
                             <div className="text-[14px] font-bold text-[var(--ink)]">{p.name}</div>
-                            <div className="text-[12px] text-[var(--mute)] font-medium">Chat kholo</div>
+                            <div className="text-[12px] text-[var(--mute)] font-medium">Click to open chat</div>
                           </div>
                         </div>
                         <button onClick={() => setSelectedPeer(p)} className="text-[14px] text-[var(--electric)] hover:underline font-bold">
@@ -1132,7 +1119,7 @@ export default function MBMChatWorkspace() {
 
                 {friendRequests.length === 0 ? (
                   <div className="p-12 border-2 border-dashed border-[var(--ink)] rounded-[16px] text-center text-[var(--mute)] text-[14px] bg-white/60 font-medium">
-                    Koi request nahi. Popularity ka kya hi kehna.
+                    No pending friend requests.
                   </div>
                 ) : (
                   <div className="space-y-2.5 text-[14px] font-semibold">
@@ -1140,7 +1127,7 @@ export default function MBMChatWorkspace() {
                       <div key={req.id} className="p-4 rounded-[12px] bg-white border-2 border-[var(--ink)] flex items-center justify-between nb-card">
                         <div>
                           <div className="font-bold text-[var(--ink)] text-[16px]">{req.sender_name}</div>
-                          <div className="text-[12px] text-[var(--mute)] mt-0.5 font-medium">Dosti karna chahta hai</div>
+                          <div className="text-[12px] text-[var(--mute)] mt-0.5 font-medium">Wants to connect with you</div>
                         </div>
                         <button onClick={() => handleAcceptRequest(req.id)} className="px-4 py-2.5 nb-mint hover:opacity-90 text-[var(--ink)] font-bold rounded-[10px] flex items-center gap-1.5">
                           <Check className="w-3.5 h-3.5" />
@@ -1180,7 +1167,7 @@ export default function MBMChatWorkspace() {
                     className="px-4 py-2 nb-sun hover:opacity-90 text-black text-[14px] font-bold rounded-[10px] flex items-center gap-2"
                   >
                     <Camera className="w-3.5 h-3.5" />
-                    <span>Snap lo</span>
+                    <span>Take Snap</span>
                   </button>
                 </div>
 
@@ -1193,7 +1180,7 @@ export default function MBMChatWorkspace() {
                       type="text" 
                       value={snapCaption} 
                       onChange={e => setSnapCaption(e.target.value)} 
-                      placeholder="Caption likho (kuch hatke)" 
+                      placeholder="Add a caption..." 
                       className="w-full bg-white border-2 border-[var(--ink)] rounded-[10px] px-3.5 py-3 text-[14px] text-[var(--ink)] outline-none focus:border-[var(--ink)] font-sans nb-input" 
                     />
                     <div className="flex gap-2">
@@ -1204,7 +1191,7 @@ export default function MBMChatWorkspace() {
                 )}
 
                 {publicSnaps.length === 0 ? (
-                  <div className="p-12 border-2 border-dashed border-[var(--ink)] rounded-[16px] text-center text-[var(--mute)] text-[14px] bg-white/60 font-medium">Wall khaali hai. Pehla snap tum daalo, koi judge nahi karega (zyada).</div>
+                  <div className="p-12 border-2 border-dashed border-[var(--ink)] rounded-[16px] text-center text-[var(--mute)] text-[14px] bg-white/60 font-medium">No active campus snaps. Be the first to share!</div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {publicSnaps.map(snap => (
@@ -1230,11 +1217,11 @@ export default function MBMChatWorkspace() {
             {activeTab === 'market' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-[24px] leading-tight font-bold text-[var(--ink)]">Bazaar</h2>
-                  <button onClick={() => setShowMarketModal(true)} className="px-4 py-2 nb-mint hover:opacity-90 text-[var(--ink)] text-[14px] font-bold rounded-[10px]">Item daalo</button>
+                  <h2 className="text-[24px] leading-tight font-bold text-[var(--ink)]">Marketplace</h2>
+                  <button onClick={() => setShowMarketModal(true)} className="px-4 py-2 nb-mint hover:opacity-90 text-[var(--ink)] text-[14px] font-bold rounded-[10px]">List Item</button>
                 </div>
                 {marketItems.length === 0 ? (
-                  <div className="p-12 border-2 border-dashed border-[var(--ink)] rounded-[16px] text-center text-[var(--mute)] text-[14px] bg-white/60 font-medium">Kuch bika nahi, kyunki kuch listed nahi.</div>
+                  <div className="p-12 border-2 border-dashed border-[var(--ink)] rounded-[16px] text-center text-[var(--mute)] text-[14px] bg-white/60 font-medium">No marketplace items listed.</div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {marketItems.map(item => (
@@ -1244,7 +1231,7 @@ export default function MBMChatWorkspace() {
                           <h4 className="text-[var(--ink)] font-bold text-[16px] mt-2">{item.title}</h4>
                           <div className="text-[12.5px] text-[var(--mute)] mt-1 font-medium">Seller: {item.seller}</div>
                         </div>
-                        <div className="text-[12.5px] text-[var(--electric)] pt-2 border-t border-[var(--line)] font-semibold"><Phone className="w-3.5 h-3.5 inline -mt-0.5 mr-1.5" />{item.contact || 'App me chat karlo'}</div>
+                        <div className="text-[12.5px] text-[var(--electric)] pt-2 border-t border-[var(--line)] font-semibold"><Phone className="w-3.5 h-3.5 inline -mt-0.5 mr-1.5" />{item.contact || 'Chat in App'}</div>
                       </div>
                     ))}
                   </div>
@@ -1256,11 +1243,11 @@ export default function MBMChatWorkspace() {
             {activeTab === 'events' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-[24px] leading-tight font-bold text-[var(--ink)]">Events</h2>
-                  <button onClick={() => setShowEventModal(true)} className="px-4 py-2 nb-electric hover:opacity-90 text-[var(--ink)] text-[14px] font-bold rounded-[10px]">Event daalo</button>
+                  <h2 className="text-[24px] leading-tight font-bold text-[var(--ink)]">Events Hub</h2>
+                  <button onClick={() => setShowEventModal(true)} className="px-4 py-2 nb-electric hover:opacity-90 text-[var(--ink)] text-[14px] font-bold rounded-[10px]">Post Event</button>
                 </div>
                 {eventsList.length === 0 ? (
-                  <div className="p-12 border-2 border-dashed border-[var(--ink)] rounded-[16px] text-center text-[var(--mute)] text-[14px] bg-white/60 font-medium">Koi event nahi. College ne phir sab cancel kar diya?</div>
+                  <div className="p-12 border-2 border-dashed border-[var(--ink)] rounded-[16px] text-center text-[var(--mute)] text-[14px] bg-white/60 font-medium">No upcoming university events.</div>
                 ) : (
                   <div className="space-y-3">
                     {eventsList.map(ev => (
@@ -1300,7 +1287,7 @@ export default function MBMChatWorkspace() {
                       <textarea rows={3} value={studentBio} onChange={e => setStudentBio(e.target.value)} className="w-full bg-white border-2 border-[var(--ink)] rounded-[12px] p-3.5 text-[var(--ink)] text-[14px] outline-none focus:border-[var(--ink)] font-sans nb-input" />
                     </div>
                     <button onClick={handleSaveBio} disabled={savingBio} className="w-full py-3 nb-electric hover:opacity-90 text-[var(--ink)] font-bold rounded-[10px] mt-3 transition">
-                      <span>{savingBio ? 'Save ho raha hai...' : 'Bio save karo'}</span>
+                      <span>{savingBio ? 'Saving Changes...' : 'Save Profile Bio'}</span>
                     </button>
                   </div>
                 </div>
@@ -1328,18 +1315,18 @@ export default function MBMChatWorkspace() {
           {/* Right Sidebar Quick Actions */}
           <aside className="hidden md:block md:col-span-3 border-l-2 border-[var(--ink)] p-4 space-y-4 text-[14px] font-semibold">
             <div className="p-4 rounded-[16px] bg-white border-2 border-[var(--ink)] space-y-3 nb-card">
-              <span className="text-[12px] font-bold text-[var(--electric)] block">Shortcuts (aalsi logon ke liye)</span>
+              <span className="text-[12px] font-bold text-[var(--electric)] block">Quick Shortcuts</span>
               <button onClick={() => setActiveTab('feed')} className="w-full py-2.5 bg-[var(--paper)] nb-ghost hover:bg-[var(--sun)] text-[var(--ink)] font-bold rounded-[10px] flex items-center justify-center gap-2 transition">
                 <MessageCircle className="w-4 h-4 text-[var(--electric)]" />
-                <span>Post kar do</span>
+                <span>Post Opinion</span>
               </button>
               <button onClick={() => setShowMarketModal(true)} className="w-full py-2.5 bg-[var(--paper)] nb-ghost hover:bg-[var(--sun)] text-[var(--ink)] font-bold rounded-[10px] flex items-center justify-center gap-2 transition">
                 <ShoppingBag className="w-4 h-4 text-[#0E7C5A]" />
-                <span>Kuch becho</span>
+                <span>List Item</span>
               </button>
               <button onClick={() => snapFileInputRef.current?.click()} className="w-full py-2.5 bg-[var(--paper)] nb-ghost hover:bg-[var(--sun)] text-[var(--ink)] font-bold rounded-[10px] flex items-center justify-center gap-2 transition">
                 <Camera className="w-4 h-4 text-[#9A6700]" />
-                <span>Snap lo</span>
+                <span>Capture Snap</span>
               </button>
             </div>
           </aside>
@@ -1360,8 +1347,8 @@ export default function MBMChatWorkspace() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-[10px] transition ${
- activeTab === tab.id ? 'nb-sun font-bold' : 'text-[var(--mute)] border-2 border-transparent hover:text-[var(--ink)]'
- }`}
+             activeTab === tab.id ? 'nb-sun font-bold' : 'text-[var(--mute)] border-2 border-transparent hover:text-[var(--ink)]'
+            }`}
           >
             <tab.icon className="w-5 h-5" />
             <span className="text-[12px] mt-0.5">{tab.label}</span>
@@ -1387,18 +1374,18 @@ export default function MBMChatWorkspace() {
             <div className="flex items-center justify-between">
               <h3 className="text-[16px] font-bold text-[var(--ink)] flex items-center gap-2">
                 <UserPlus className="w-4 h-4 text-[var(--electric)]" />
-                <span>MBM wale</span>
+                <span>Student Directory</span>
               </h3>
               <button onClick={() => setShowAddFriendModal(false)} className="text-[var(--mute)] hover:text-[var(--ink)]">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-[14px] text-[var(--mute)] font-medium">Kisko dost banana hai? Soch ke chuno.</p>
+            <p className="text-[14px] text-[var(--mute)] font-medium">Select a student to send a connection request:</p>
 
             <div className="max-h-60 overflow-y-auto space-y-2 text-[14px] font-semibold">
               {allRegisteredUsers.length === 0 ? (
-                <p className="text-[var(--mute)] text-center py-6">Koi aur mila hi nahi. Sab busy honge.</p>
+                <p className="text-[var(--mute)] text-center py-6">No other registered students found.</p>
               ) : (
                 allRegisteredUsers.map(user => (
                   <div key={user.id} className="p-3 rounded-[12px] bg-[var(--paper)] border-2 border-[var(--line)] flex items-center justify-between">
@@ -1407,7 +1394,7 @@ export default function MBMChatWorkspace() {
                       <div className="text-[12px] text-[var(--electric)] font-medium">{user.branch} • {user.year}</div>
                     </div>
                     <button onClick={() => handleSendFriendRequest(user)} className="px-3.5 py-1.5 nb-electric text-[var(--ink)] rounded-[10px] text-[12px] font-bold">
-                      Request bhejo
+                      Send Request
                     </button>
                   </div>
                 ))
@@ -1424,7 +1411,7 @@ export default function MBMChatWorkspace() {
             <div className="flex items-center justify-between">
               <h3 className="text-[16px] font-bold text-[var(--ink)] flex items-center gap-2">
                 <ShoppingBag className="w-4 h-4 text-[#0E7C5A]" />
-                <span>Kya bechna hai?</span>
+                <span>List an Item for Sale</span>
               </h3>
               <button onClick={() => setShowMarketModal(false)} className="text-[var(--mute)] hover:text-[var(--ink)]">
                 <X className="w-4 h-4" />
@@ -1451,7 +1438,7 @@ export default function MBMChatWorkspace() {
                   </select>
                 </div>
               </div>
-              <button onClick={handleCreateMarketItem} className="w-full py-3 nb-mint text-[var(--ink)] font-bold rounded-[10px] mt-2">Listing daalo</button>
+              <button onClick={handleCreateMarketItem} className="w-full py-3 nb-mint text-[var(--ink)] font-bold rounded-[10px] mt-2">Post Listing</button>
             </div>
           </div>
         </div>
@@ -1464,7 +1451,7 @@ export default function MBMChatWorkspace() {
             <div className="flex items-center justify-between">
               <h3 className="text-[16px] font-bold text-[var(--ink)] flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-[var(--electric)]" />
-                <span>Event batao</span>
+                <span>Post University Event</span>
               </h3>
               <button onClick={() => setShowEventModal(false)} className="text-[var(--mute)] hover:text-[var(--ink)]"><X className="w-4 h-4" /></button>
             </div>
@@ -1472,7 +1459,7 @@ export default function MBMChatWorkspace() {
               <input type="text" value={eventTitle} onChange={e => setEventTitle(e.target.value)} placeholder="Event Title" className="w-full bg-white border-2 border-[var(--ink)] rounded-[10px] px-3.5 py-2.5 text-[var(--ink)] outline-none font-sans nb-input" />
               <input type="text" value={eventDate} onChange={e => setEventDate(e.target.value)} placeholder="Date & Timing" className="w-full bg-white border-2 border-[var(--ink)] rounded-[10px] px-3.5 py-2.5 text-[var(--ink)] outline-none font-sans nb-input" />
               <input type="text" value={eventVenue} onChange={e => setEventVenue(e.target.value)} placeholder="Venue" className="w-full bg-white border-2 border-[var(--ink)] rounded-[10px] px-3.5 py-2.5 text-[var(--ink)] outline-none font-sans nb-input" />
-              <button onClick={handleCreateEvent} className="w-full py-3 nb-electric text-[var(--ink)] font-bold rounded-[10px] mt-2">Announce karo</button>
+              <button onClick={handleCreateEvent} className="w-full py-3 nb-electric text-[var(--ink)] font-bold rounded-[10px] mt-2">Announce Event</button>
             </div>
           </div>
         </div>
