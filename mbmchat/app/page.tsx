@@ -719,7 +719,7 @@ export default function MBMChatWorkspace() {
         </div>
 
         <footer className="w-full py-5 text-center text-[12.5px] text-[var(--mute)] border-t-2 border-[var(--ink)] bg-white space-y-1">
-          <p>© 2026 MBM Students only. All rights reserved. T&C Applied.</p>
+          <p>© 2026 MBM Students only. T&C Applied.</p>
           <p className="font-bold text-[var(--ink)]">Developed by Vineet Kaler</p>
         </footer>
       </div>
@@ -871,7 +871,7 @@ export default function MBMChatWorkspace() {
                     <span className="w-2 h-2 rounded-full bg-[#0E9F6E]"></span>
                     {branch} • {year} • Roll: {rollNo}
                   </p>
-                  <span className="sticker nb-pink mt-4" style={{ '--r': '-2deg' } as React.CSSProperties}>attendance short hai, chat full hai</span>
+                  <span className="sticker nb-pink mt-4" style={{ '--r': '-2deg' } as React.CSSProperties}>Engineering chaos into clean code.</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center text-[14px] font-semibold">
@@ -1363,7 +1363,7 @@ export default function MBMChatWorkspace() {
 
       {/* Footer on Main Dashboard */}
       <footer className="w-full py-4 text-center text-[12.5px] text-[var(--mute)] border-t border-[var(--line)] space-y-1 mb-16 md:mb-0 font-medium">
-        <p>© 2026 MBM Students only. All rights reserved. T&C Applied.</p>
+        <p>© 2026 MBM Students only. T&C Applied.</p>
         <p className="text-[var(--electric)] font-bold">Developed by Vineet Kaler</p>
       </footer>
 
